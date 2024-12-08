@@ -1,3 +1,5 @@
 ffmpeg-python==0.2.0
 faster-whisper==0.10.0
 flask==3.0.0
+pytest==7.4.3
+pytest-cov==4.1.0
