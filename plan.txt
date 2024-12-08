@@ -1,0 +1,17 @@
+This project processes a video file of a meeting, to pull out the key moments of the meeting, and key takeaways.
+
+The processing steps are:
+1. Extract the audio from the video file
+2. Transcribe the audio to subtitles
+3. Extract the key moments from the subtitles with their timecodes.
+4. Extract the key takeaways for each key moment of the meeting
+5. Re-write the video file with the key moments as chapters
+6. Write a webpage with the key moments and takeaways, with links to the video file at their timecodes.
+
+The project will be implemented in Python and use:
+- ffmpeg for video and audio processing
+- insanely fast whisper for the transcription
+- ollama for the key moments extraction and key takeaway summarization
+- flask for the webpage generation
+
+The project will be implemented in a modular way, so that each step can be run independently, and the project can be run from any step.
