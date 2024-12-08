@@ -1,8 +1,36 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import argparse
+import subprocess
 from pathlib import Path
+
+def check_ffmpeg():
+    """Check if ffmpeg is installed and accessible."""
+    try:
+        subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
+        return True
+    except (subprocess.SubprocessError, FileNotFoundError):
+        print("Error: ffmpeg is not installed or not found in PATH")
+        print("\nTo install ffmpeg:")
+        print("- On macOS: brew install ffmpeg")
+        print("- On Ubuntu/Debian: sudo apt-get install ffmpeg")
+        print("- On Windows: Download from https://ffmpeg.org/download.html")
+        return False
+
+def check_python_dependencies():
+    """Check if required Python packages are installed."""
+    try:
+        import ffmpeg
+        import faster_whisper
+        return True
+    except ImportError as e:
+        missing_package = str(e).split("'")[1]
+        print(f"Error: Required Python package '{missing_package}' is not installed")
+        print("\nTo install required packages:")
+        print("pip install -r requirements.txt")
+        return False
 
 def process_video(video_path: str, output_dir: str = "output"):
     """
@@ -35,6 +63,10 @@ def process_video(video_path: str, output_dir: str = "output"):
     # generate_webpage(key_moments, takeaways, chaptered_video, output_dir)
 
 def main():
+    # Check dependencies before proceeding
+    if not check_ffmpeg() or not check_python_dependencies():
+        sys.exit(1)
+
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store output files")
