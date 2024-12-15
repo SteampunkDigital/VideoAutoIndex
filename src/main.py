@@ -6,10 +6,10 @@ import json
 import argparse
 import subprocess
 from pathlib import Path
-from .video_processor import VideoProcessor
-from .transcriber import Transcriber
-from .key_moments import KeyMomentsExtractor
-from .web_generator import WebGenerator
+from video_processor import VideoProcessor
+from transcriber import Transcriber
+from key_moments import KeyMomentsExtractor
+from web_generator import WebGenerator
 
 def check_ffmpeg():
     """Check if ffmpeg is installed and accessible."""
@@ -28,7 +28,8 @@ def check_python_dependencies():
     """Check if required Python packages are installed."""
     try:
         import ffmpeg
-        import faster_whisper
+        import torch
+        import transformers
         import anthropic
         import flask
         return True
@@ -113,4 +114,8 @@ def main():
     process_video(args.video_path, args.output_dir)
 
 if __name__ == "__main__":
+    # Add src directory to Python path
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    if src_dir not in sys.path:
+        sys.path.append(src_dir)
     main()

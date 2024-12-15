@@ -29,12 +29,17 @@ class VideoProcessor:
         output_path = os.path.join(output_dir, f"{self.video_path.stem}_audio.wav")
         
         try:
-            stream = ffmpeg.input(str(self.video_path))
-            stream = ffmpeg.output(stream, output_path, acodec='pcm_s16le', ac=1, ar='16k')
-            ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+            # Use ffmpeg-python's stream processing
+            (
+                ffmpeg
+                .input(str(self.video_path))
+                .output(output_path, acodec='pcm_s16le', ac=1, ar='16k')
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True)
+            )
             return output_path
         except ffmpeg.Error as e:
-            print(f"Error extracting audio: {e.stderr.decode()}")
+            print(f"Error extracting audio: {e.stderr.decode() if e.stderr else str(e)}")
             raise
 
     def add_chapters(self, analysis: List[Dict], output_dir: str) -> str:
@@ -77,35 +82,23 @@ class VideoProcessor:
                 f.write(f"title={topic['topic']}\n")
 
         try:
-            # Run ffmpeg command to copy video with chapters
-            args = [
-                'ffmpeg',
-                '-i', str(self.video_path),
-                '-i', metadata_path,
-                '-map_metadata', '1',
-                '-codec', 'copy',
-                '-y',
-                output_path
-            ]
-            
-            # Use subprocess to run ffmpeg directly
-            import subprocess
-            result = subprocess.run(
-                args,
-                capture_output=True,
-                text=True
+            # Use ffmpeg-python for adding chapters
+            (
+                ffmpeg
+                .input(str(self.video_path))
+                .input(metadata_path)
+                .output(output_path, map_metadata=1, codec='copy')
+                .overwrite_output()
+                .run(capture_stdout=True, capture_stderr=True)
             )
-            
-            if result.returncode != 0:
-                raise Exception(f"ffmpeg error: {result.stderr}")
             
             # Clean up metadata file
             os.remove(metadata_path)
             
             return output_path
             
-        except Exception as e:
-            print(f"Error adding chapters: {str(e)}")
+        except ffmpeg.Error as e:
+            print(f"Error adding chapters: {e.stderr.decode() if e.stderr else str(e)}")
             if os.path.exists(metadata_path):
                 os.remove(metadata_path)
             raise

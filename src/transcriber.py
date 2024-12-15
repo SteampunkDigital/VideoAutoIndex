@@ -1,21 +1,38 @@
-# transcriber.py
-import faster_whisper
 import os
+import torch
+from transformers import pipeline
+from transformers.utils import is_flash_attn_2_available
 
 class Transcriber:
-    def __init__(self, audio_path: str, model_size: str = "large-v3"):
+    def __init__(self, audio_path: str, model_name: str = "openai/whisper-large-v3"):
         """
         Initialize the transcriber.
         
         Args:
             audio_path: Path to the input audio file
-            model_size: Size of the Whisper model to use (default: "large-v3")
+            model_name: Name of the Whisper model to use (default: "openai/whisper-large-v3")
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
         self.audio_path = audio_path
-        self.model = faster_whisper.WhisperModel(model_size)
+        
+        # Auto-detect device
+        if torch.backends.mps.is_available():
+            device = "mps"  # Use Apple Silicon GPU
+        elif torch.cuda.is_available():
+            device = "cuda:0"
+        else:
+            device = "cpu"
+            
+        # Initialize the pipeline with optimizations
+        self.pipe = pipeline(
+            "automatic-speech-recognition",
+            model=model_name,
+            torch_dtype=torch.float16,
+            device=device,
+            model_kwargs={"attn_implementation": "flash_attention_2"} if is_flash_attn_2_available() else {"attn_implementation": "sdpa"},
+        )
 
     def transcribe(self, output_dir: str) -> str:
         """
@@ -35,16 +52,20 @@ class Transcriber:
         subtitle_filename = f"{os.path.splitext(audio_filename)[0]}.srt"
         subtitle_path = os.path.join(output_dir, subtitle_filename)
 
-        # Transcribe the audio
-        result = self.model.transcribe(self.audio_path)
-        segments = result[0]
+        # Transcribe with optimized settings
+        result = self.pipe(
+            self.audio_path,
+            chunk_length_s=30,
+            batch_size=24,
+            return_timestamps=True,
+        )
 
         # Write the segments to the subtitle file
-        with open(subtitle_path, "w") as f:
-            for i, segment in enumerate(segments):
-                start_time = self._format_time(segment.start)
-                end_time = self._format_time(segment.end)
-                transcript = segment.text
+        with open(subtitle_path, "w", encoding="utf-8") as f:
+            for i, chunk in enumerate(result["chunks"]):
+                start_time = self._format_time(chunk["timestamp"][0])
+                end_time = self._format_time(chunk["timestamp"][1])
+                transcript = chunk["text"].strip()
 
                 f.write(f"{i+1}\n")
                 f.write(f"{start_time} --> {end_time}\n")

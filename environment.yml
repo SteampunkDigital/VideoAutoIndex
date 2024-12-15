@@ -4,11 +4,16 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - ffmpeg
   - pip
   - pip:
-    - ffmpeg-python==0.2.0
-    - faster-whisper==0.10.0
-    - flask==3.0.0
-    - pytest==7.4.3
-    - pytest-cov==4.1.0
+    - torch
+    - torchaudio
+    - numpy<2.0
+    - ffmpeg-python
+    - flask
+    - transformers>=4.35.0
+    - optimum>=1.13.2
+    - accelerate>=0.24.1
+    - rich>=13.7.0
+    - setuptools>=68.2.2
+    - anthropic
