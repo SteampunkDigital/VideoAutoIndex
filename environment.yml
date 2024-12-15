@@ -6,6 +6,9 @@ dependencies:
   - python=3.11
   - pip
   - mlx
+  - pytest
+  - pytest-cov
+  - beautifulsoup4
   - pip:
     - "numpy<2"
     - ffmpeg-python
