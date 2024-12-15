@@ -57,15 +57,20 @@ def process_video(video_path: str, output_dir: str = "output"):
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
+    print("\nProcessing video...")
+    
     # Extract audio from the video file
+    print("1. Extracting audio...")
     processor = VideoProcessor(video_path)
     audio_path = processor.extract_audio(output_dir)
 
     # Transcribe the extracted audio file
+    print("2. Transcribing audio...")
     transcriber = Transcriber(audio_path)
     subtitle_path = transcriber.transcribe(output_dir)
     
     # Extract topics, key moments, and takeaways from the subtitles
+    print("3. Analyzing content...")
     key_extractor = KeyMomentsExtractor(subtitle_path)
     analysis = key_extractor.extract_key_moments()
     
@@ -73,15 +78,18 @@ def process_video(video_path: str, output_dir: str = "output"):
     analysis_path = os.path.join(output_dir, "meeting_analysis.json")
     with open(analysis_path, "w") as f:
         json.dump(analysis, f, indent=2)
+    print(f"   Analysis saved to: {analysis_path}")
     
-    print(f"\nMeeting analysis saved to: {analysis_path}")
+    # Add chapters to video using topic timestamps
+    print("4. Adding chapters to video...")
+    chaptered_video = processor.add_chapters(analysis, output_dir)
+    print(f"   Chaptered video saved to: {chaptered_video}")
     
-    # TODO: Implement remaining steps:
-    # 4. Add chapters to video using topic timestamps
-    # chaptered_video = processor.add_chapters(analysis, output_dir)
-    
+    # TODO: Implement final step:
     # 5. Generate webpage with topics, key moments, and takeaways
     # generate_webpage(analysis, chaptered_video, output_dir)
+    
+    print("\nProcessing complete!")
 
 def main():
     # Check all dependencies before proceeding
