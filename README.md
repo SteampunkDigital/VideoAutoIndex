@@ -6,6 +6,8 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 - Extracts audio from video files
 - Transcribes speech to text using faster-whisper
+  - Uses large-v3 model by default for best accuracy
+  - Configurable model size for different use cases
 - Analyzes content to identify:
   - Major topics with timestamps
   - Key moments within each topic
@@ -55,7 +57,7 @@ python src/main.py path/to/video.mp4 [--output-dir output]
 
 This will:
 1. Extract audio from the video
-2. Transcribe the audio
+2. Transcribe the audio using Whisper large-v3 model
 3. Analyze the content for topics and key moments
 4. Add chapters to the video
 5. Generate an HTML summary page
@@ -66,6 +68,31 @@ The output directory will contain:
 - `*.srt`: Generated subtitles
 - `*_chaptered.mp4`: Video file with chapter markers
 - `meeting_summary.html`: Interactive summary webpage
+
+## Advanced Usage
+
+### Transcription Models
+
+The transcriber supports different Whisper model sizes:
+```python
+from src.transcriber import Transcriber
+
+# Use default large-v3 model for best accuracy
+transcriber = Transcriber(audio_path)
+
+# Use smaller model for faster processing
+transcriber = Transcriber(audio_path, model_size="medium")
+
+# Use tiny model for testing
+transcriber = Transcriber(audio_path, model_size="tiny")
+```
+
+Available model sizes:
+- `tiny`: Fastest, lowest accuracy
+- `base`: Fast, basic accuracy
+- `small`: Balanced speed/accuracy
+- `medium`: Good accuracy
+- `large-v3`: Best accuracy (default)
 
 ## Output Format
 
