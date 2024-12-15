@@ -3,19 +3,19 @@ import faster_whisper
 import os
 
 class Transcriber:
-    def __init__(self, audio_path: str):
+    def __init__(self, audio_path: str, model_size: str = "large-v3"):
         """
         Initialize the transcriber.
         
         Args:
             audio_path: Path to the input audio file
+            model_size: Size of the Whisper model to use (default: "large-v3")
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
         self.audio_path = audio_path
-        # Use tiny model for testing, allow downloads
-        self.model = faster_whisper.WhisperModel("tiny", local_files_only=False)
+        self.model = faster_whisper.WhisperModel(model_size)
 
     def transcribe(self, output_dir: str) -> str:
         """

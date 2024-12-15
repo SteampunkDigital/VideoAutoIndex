@@ -9,13 +9,13 @@ def test_transcriber_init(temp_dir):
     with open(audio_path, "wb") as f:
         f.write(b"dummy audio data")
     
-    transcriber = Transcriber(audio_path)
+    transcriber = Transcriber(audio_path, model_size="tiny")
     assert transcriber.audio_path == audio_path
 
 def test_transcriber_init_invalid_path():
     """Test Transcriber initialization with non-existent audio file."""
     with pytest.raises(FileNotFoundError):
-        Transcriber("nonexistent_audio.wav")
+        Transcriber("nonexistent_audio.wav", model_size="tiny")
 
 @pytest.mark.integration
 def test_transcribe(sample_video, temp_dir):
@@ -26,7 +26,7 @@ def test_transcribe(sample_video, temp_dir):
     audio_path = processor.extract_audio(temp_dir)
     
     # Then transcribe the audio
-    transcriber = Transcriber(audio_path)
+    transcriber = Transcriber(audio_path, model_size="tiny")
     subtitle_path = transcriber.transcribe(temp_dir)
     
     # Check that subtitle file was created
@@ -57,7 +57,7 @@ def test_transcribe_creates_output_dir(sample_video, temp_dir):
     output_dir = os.path.join(temp_dir, "nested", "output")
     
     # Transcribe should create the directory
-    transcriber = Transcriber(audio_path)
+    transcriber = Transcriber(audio_path, model_size="tiny")
     subtitle_path = transcriber.transcribe(output_dir)
     
     assert os.path.exists(output_dir)
@@ -71,6 +71,6 @@ def test_transcribe_invalid_audio(temp_dir):
     with open(invalid_audio, "wb") as f:
         f.write(b"not a valid wav file")
     
-    transcriber = Transcriber(invalid_audio)
+    transcriber = Transcriber(invalid_audio, model_size="tiny")
     with pytest.raises(Exception):
         transcriber.transcribe(temp_dir)

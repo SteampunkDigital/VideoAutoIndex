@@ -95,8 +95,15 @@ def test_check_api_key_not_set(monkeypatch):
     assert check_api_key() is False
 
 @pytest.mark.integration
-def test_full_pipeline(sample_video, temp_dir, mock_anthropic):
+def test_full_pipeline(sample_video, temp_dir, mock_anthropic, monkeypatch):
     """Test the complete video processing pipeline."""
+    # Mock Transcriber to use tiny model
+    from src.transcriber import Transcriber
+    original_init = Transcriber.__init__
+    def mock_init(self, audio_path, model_size="tiny"):
+        return original_init(self, audio_path, model_size)
+    monkeypatch.setattr(Transcriber, "__init__", mock_init)
+    
     process_video(sample_video, temp_dir)
     
     # Check that all expected output files were created
@@ -131,8 +138,15 @@ def test_full_pipeline(sample_video, temp_dir, mock_anthropic):
         assert "takeaway" in content.lower()
 
 @pytest.mark.integration
-def test_pipeline_creates_output_dir(sample_video, temp_dir, mock_anthropic):
+def test_pipeline_creates_output_dir(sample_video, temp_dir, mock_anthropic, monkeypatch):
     """Test that the pipeline creates nested output directories."""
+    # Mock Transcriber to use tiny model
+    from src.transcriber import Transcriber
+    original_init = Transcriber.__init__
+    def mock_init(self, audio_path, model_size="tiny"):
+        return original_init(self, audio_path, model_size)
+    monkeypatch.setattr(Transcriber, "__init__", mock_init)
+    
     output_dir = os.path.join(temp_dir, "nested", "output")
     process_video(sample_video, output_dir)
     assert os.path.exists(output_dir)
