@@ -27,7 +27,7 @@ def check_python_dependencies():
     try:
         import ffmpeg
         import faster_whisper
-        import requests  # Required for ollama API calls
+        import anthropic
         return True
     except ImportError as e:
         missing_package = str(e).split("'")[1]
@@ -36,19 +36,14 @@ def check_python_dependencies():
         print("pip install -r requirements.txt")
         return False
 
-def check_ollama():
-    """Check if ollama is running and accessible."""
-    try:
-        import requests
-        response = requests.get("http://localhost:11434/api/version")
-        return response.status_code == 200
-    except requests.exceptions.ConnectionError:
-        print("Error: Ollama is not running or not accessible at http://localhost:11434")
-        print("\nTo start ollama:")
-        print("1. Make sure ollama is installed (https://ollama.ai)")
-        print("2. Run 'ollama serve' in a terminal")
-        print("3. In another terminal, run 'ollama pull mistral' to download the required model")
+def check_api_key():
+    """Check if Anthropic API key is set."""
+    if not os.environ.get('ANTHROPIC_API_KEY'):
+        print("Error: ANTHROPIC_API_KEY environment variable is not set")
+        print("\nTo set the API key:")
+        print("export ANTHROPIC_API_KEY='your-api-key'")
         return False
+    return True
 
 def process_video(video_path: str, output_dir: str = "output"):
     """
@@ -73,6 +68,13 @@ def process_video(video_path: str, output_dir: str = "output"):
     key_extractor = KeyMomentsExtractor(subtitle_path)
     key_moments = key_extractor.extract_key_moments()
     
+    # Save key moments to a JSON file
+    key_moments_path = os.path.join(output_dir, "key_moments.json")
+    with open(key_moments_path, "w") as f:
+        json.dump(key_moments, f, indent=2)
+    
+    print(f"\nKey moments extracted and saved to: {key_moments_path}")
+    
     # TODO: Implement remaining steps:
     # 4. Generate takeaways
     # takeaways = extract_takeaways(key_moments)
@@ -88,7 +90,7 @@ def main():
     if not all([
         check_ffmpeg(),
         check_python_dependencies(),
-        check_ollama()
+        check_api_key()
     ]):
         sys.exit(1)
 
