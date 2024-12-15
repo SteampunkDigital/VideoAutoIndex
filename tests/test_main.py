@@ -76,7 +76,7 @@ def test_check_python_dependencies_all_installed(monkeypatch):
 def test_check_python_dependencies_missing(monkeypatch):
     """Test Python dependencies check when a package is missing."""
     def mock_import(name, *args, **kwargs):
-        if name == "anthropic":
+        if name == "whisper_mps":
             raise ImportError(f"No module named '{name}'")
         return True
     
@@ -101,7 +101,7 @@ def test_full_pipeline(sample_video, temp_dir, mock_anthropic, monkeypatch):
     from src.transcriber import Transcriber
     original_init = Transcriber.__init__
     def mock_init(self, audio_path, model_size="tiny"):
-        return original_init(self, audio_path, model_size)
+        return original_init(self, audio_path, model_size=model_size)
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
     process_video(sample_video, temp_dir)
@@ -144,7 +144,7 @@ def test_pipeline_creates_output_dir(sample_video, temp_dir, mock_anthropic, mon
     from src.transcriber import Transcriber
     original_init = Transcriber.__init__
     def mock_init(self, audio_path, model_size="tiny"):
-        return original_init(self, audio_path, model_size)
+        return original_init(self, audio_path, model_size=model_size)
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
     output_dir = os.path.join(temp_dir, "nested", "output")

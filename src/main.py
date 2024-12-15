@@ -28,8 +28,7 @@ def check_python_dependencies():
     """Check if required Python packages are installed."""
     try:
         import ffmpeg
-        import torch
-        import transformers
+        import whisper_mps
         import anthropic
         import flask
         return True
