@@ -1,8 +1,24 @@
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
+[project]
+name = "video-auto-index"
+version = "0.1.0"
+description = "Process meeting videos to extract key moments and takeaways"
+requires-python = ">=3.8"
+dependencies = [
+    "ffmpeg-python",
+    "faster-whisper",
+    "flask",
+    "anthropic",
+    "beautifulsoup4",
+]
 
 [tool.pytest.ini_options]
-pythonpath = [
-  "."
+addopts = "-v --cov=src --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "integration: marks tests that require external services or full pipeline integration",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

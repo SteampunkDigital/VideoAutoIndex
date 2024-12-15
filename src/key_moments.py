@@ -12,6 +12,9 @@ class KeyMomentsExtractor:
         Args:
             subtitle_path: Path to the input subtitle file
         """
+        if not os.path.exists(subtitle_path):
+            raise FileNotFoundError(f"Subtitle file not found: {subtitle_path}")
+            
         self.subtitle_path = subtitle_path
         self.anthropic = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
         if not os.environ.get('ANTHROPIC_API_KEY'):
@@ -79,10 +82,13 @@ class KeyMomentsExtractor:
                     "content": prompt
                 }]
             )
-            
-            # Parse the response
-            topics = json.loads(response.content)
-            
+
+            try:
+                # Parse the response
+                topics = json.loads(response.content)
+            except json.JSONDecodeError:
+                raise Exception("Failed to parse API response: Invalid JSON format")
+
             # Validate the response format
             if not isinstance(topics, list):
                 raise ValueError("Expected a list of topics")
@@ -118,7 +124,7 @@ class KeyMomentsExtractor:
             return topics
             
         except Exception as e:
-            raise Exception(f"Failed to extract topics and key moments: {str(e)}")
+            raise Exception(f"Failed to parse API response: {str(e)}")
 
     def _validate_timestamp_format(self, timestamp: str) -> None:
         """

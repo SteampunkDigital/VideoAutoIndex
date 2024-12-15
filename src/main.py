@@ -6,10 +6,10 @@ import json
 import argparse
 import subprocess
 from pathlib import Path
-from video_processor import VideoProcessor
-from transcriber import Transcriber
-from key_moments import KeyMomentsExtractor
-from web_generator import WebGenerator
+from .video_processor import VideoProcessor
+from .transcriber import Transcriber
+from .key_moments import KeyMomentsExtractor
+from .web_generator import WebGenerator
 
 def check_ffmpeg():
     """Check if ffmpeg is installed and accessible."""

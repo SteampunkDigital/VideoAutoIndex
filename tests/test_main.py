@@ -2,43 +2,51 @@ import pytest
 import os
 import json
 import subprocess
+from pathlib import Path
 from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key
 
 @pytest.fixture
-def mock_anthropic(monkeypatch):
-    """Mock Anthropic API for testing."""
-    mock_response = {
+def mock_anthropic_key(monkeypatch):
+    """Mock Anthropic API key for testing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+@pytest.fixture
+def mock_anthropic_response():
+    """Mock Anthropic API response."""
+    return {
         "content": json.dumps([
             {
-                "topic": "Meeting Introduction",
+                "topic": "Project Status Update",
                 "timestamp": "00:00:00,000",
                 "key_moments": [
                     {
-                        "description": "Meeting agenda outlined",
-                        "timestamp": "00:00:05,000"
+                        "description": "Meeting introduction",
+                        "timestamp": "00:00:00,000"
                     }
                 ],
                 "takeaways": [
-                    "Review project timeline",
-                    "Discuss key deliverables"
+                    "Project kickoff successful"
                 ]
             }
         ])
     }
-    
+
+@pytest.fixture
+def mock_anthropic(monkeypatch, mock_anthropic_response):
+    """Mock Anthropic API for testing."""
     class MockMessage:
         def __init__(self, content):
-            self.content = content
+            self.content = mock_anthropic_response["content"]
     
     class MockAnthropicMessages:
         def create(self, **kwargs):
-            return MockMessage(mock_response["content"])
+            return MockMessage(None)
     
     class MockAnthropic:
         def __init__(self, api_key):
             self.messages = MockAnthropicMessages()
     
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy_key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
 
 def test_check_ffmpeg_installed(monkeypatch):

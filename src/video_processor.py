@@ -50,11 +50,11 @@ class VideoProcessor:
         """
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, f"{self.video_path.stem}_chaptered{self.video_path.suffix}")
-
-        # Create metadata file for chapters
-        metadata_path = os.path.join(output_dir, "chapters.txt")
+        
+        # Create temporary metadata file
+        metadata_path = os.path.join(output_dir, "ffmetadata.txt")
         with open(metadata_path, "w") as f:
-            f.write(";FFMETADATA1\n")  # Required header
+            f.write(";FFMETADATA1\n")
             
             # Add chapters
             for i, topic in enumerate(analysis):
@@ -68,33 +68,46 @@ class VideoProcessor:
                     # For the last chapter, get video duration using ffprobe
                     probe = ffmpeg.probe(str(self.video_path))
                     end_time = float(probe['format']['duration']) * 1000  # Convert to milliseconds
-
+                
                 # Write chapter metadata
                 f.write("\n[CHAPTER]\n")
-                f.write(f"TIMEBASE=1/1000\n")  # Use milliseconds as timebase
+                f.write(f"TIMEBASE=1/1000\n")
                 f.write(f"START={int(start_time)}\n")
                 f.write(f"END={int(end_time)}\n")
                 f.write(f"title={topic['topic']}\n")
 
         try:
-            # Copy video with chapter metadata
-            stream = ffmpeg.input(str(self.video_path))
-            stream = ffmpeg.output(
-                stream,
-                output_path,
-                acodec='copy',  # Copy audio stream
-                vcodec='copy',  # Copy video stream
-                metadata_file=metadata_path
+            # Run ffmpeg command to copy video with chapters
+            args = [
+                'ffmpeg',
+                '-i', str(self.video_path),
+                '-i', metadata_path,
+                '-map_metadata', '1',
+                '-codec', 'copy',
+                '-y',
+                output_path
+            ]
+            
+            # Use subprocess to run ffmpeg directly
+            import subprocess
+            result = subprocess.run(
+                args,
+                capture_output=True,
+                text=True
             )
-            ffmpeg.run(stream, overwrite_output=True, capture_stdout=True, capture_stderr=True)
+            
+            if result.returncode != 0:
+                raise Exception(f"ffmpeg error: {result.stderr}")
             
             # Clean up metadata file
             os.remove(metadata_path)
             
             return output_path
             
-        except ffmpeg.Error as e:
-            print(f"Error adding chapters: {e.stderr.decode()}")
+        except Exception as e:
+            print(f"Error adding chapters: {str(e)}")
+            if os.path.exists(metadata_path):
+                os.remove(metadata_path)
             raise
 
     def _parse_timestamp(self, timestamp: str) -> float:

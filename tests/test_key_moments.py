@@ -4,6 +4,11 @@ import json
 from src.key_moments import KeyMomentsExtractor
 
 @pytest.fixture
+def mock_anthropic_key(monkeypatch):
+    """Mock Anthropic API key for testing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+@pytest.fixture
 def sample_srt(temp_dir):
     """Create a sample SRT file for testing."""
     srt_content = """1
@@ -27,19 +32,53 @@ We've completed phase one ahead of schedule.
         f.write(srt_content)
     return srt_path
 
-def test_key_moments_init(sample_srt):
+@pytest.fixture
+def dummy_srt(temp_dir):
+    """Create a dummy SRT file for testing timestamp validation."""
+    srt_path = os.path.join(temp_dir, "dummy.srt")
+    with open(srt_path, "w") as f:
+        f.write("dummy content")
+    return srt_path
+
+@pytest.fixture
+def mock_anthropic_response():
+    """Mock Anthropic API response."""
+    return {
+        "content": json.dumps([
+            {
+                "topic": "Project Status Update",
+                "timestamp": "00:00:00,000",
+                "key_moments": [
+                    {
+                        "description": "Meeting introduction",
+                        "timestamp": "00:00:00,000"
+                    },
+                    {
+                        "description": "Phase one completion announcement",
+                        "timestamp": "00:00:15,000"
+                    }
+                ],
+                "takeaways": [
+                    "Phase one completed ahead of schedule",
+                    "Need to discuss roadmap and budget"
+                ]
+            }
+        ])
+    }
+
+def test_key_moments_init(sample_srt, mock_anthropic_key):
     """Test KeyMomentsExtractor initialization with valid subtitle file."""
     extractor = KeyMomentsExtractor(sample_srt)
     assert extractor.subtitle_path == sample_srt
 
-def test_key_moments_init_invalid_path():
+def test_key_moments_init_invalid_path(mock_anthropic_key):
     """Test KeyMomentsExtractor initialization with non-existent subtitle file."""
     with pytest.raises(FileNotFoundError):
         KeyMomentsExtractor("nonexistent.srt")
 
-def test_validate_timestamp_format():
+def test_validate_timestamp_format(dummy_srt, mock_anthropic_key):
     """Test timestamp format validation."""
-    extractor = KeyMomentsExtractor("dummy.srt")  # Path doesn't matter for this test
+    extractor = KeyMomentsExtractor(dummy_srt)
     
     # Valid timestamps
     extractor._validate_timestamp_format("00:00:00,000")
@@ -63,9 +102,9 @@ def test_validate_timestamp_format():
         with pytest.raises(ValueError):
             extractor._validate_timestamp_format(timestamp)
 
-def test_parse_timestamp():
+def test_parse_timestamp(dummy_srt, mock_anthropic_key):
     """Test timestamp parsing to seconds."""
-    extractor = KeyMomentsExtractor("dummy.srt")  # Path doesn't matter for this test
+    extractor = KeyMomentsExtractor(dummy_srt)
     
     test_cases = [
         ("00:00:00,000", 0.0),
@@ -80,44 +119,22 @@ def test_parse_timestamp():
         assert extractor._parse_timestamp(timestamp) == expected
 
 @pytest.mark.integration
-def test_extract_key_moments(sample_srt, monkeypatch):
-    """Test key moments extraction with mocked Anthropic API."""
-    # Mock Anthropic API response
-    mock_response = {
-        "content": json.dumps([
-            {
-                "topic": "Meeting Introduction",
-                "timestamp": "00:00:00,000",
-                "key_moments": [
-                    {
-                        "description": "Meeting agenda outlined",
-                        "timestamp": "00:00:05,000"
-                    }
-                ],
-                "takeaways": [
-                    "Review roadmap and budget",
-                    "Discuss project progress"
-                ]
-            }
-        ])
-    }
-    
+def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_response, monkeypatch):
+    """Test key moments extraction with mocked API."""
     class MockMessage:
         def __init__(self, content):
-            self.content = content
+            self.content = mock_anthropic_response["content"]
     
     class MockAnthropicMessages:
         def create(self, **kwargs):
-            return MockMessage(mock_response["content"])
+            return MockMessage(None)
     
     class MockAnthropic:
         def __init__(self, api_key):
             self.messages = MockAnthropicMessages()
     
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy_key")
     monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
     
-    # Test extraction
     extractor = KeyMomentsExtractor(sample_srt)
     result = extractor.extract_key_moments()
     
@@ -139,32 +156,31 @@ def test_extract_key_moments(sample_srt, monkeypatch):
         extractor._validate_timestamp_format(moment["timestamp"])
 
 @pytest.mark.integration
-def test_extract_key_moments_no_api_key(sample_srt):
+def test_extract_key_moments_no_api_key(dummy_srt):
     """Test key moments extraction fails without API key."""
     if "ANTHROPIC_API_KEY" in os.environ:
         del os.environ["ANTHROPIC_API_KEY"]
     
     with pytest.raises(ValueError, match="ANTHROPIC_API_KEY.*required"):
-        KeyMomentsExtractor(sample_srt)
+        KeyMomentsExtractor(dummy_srt)
 
 @pytest.mark.integration
-def test_extract_key_moments_invalid_response(sample_srt, monkeypatch):
+def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, monkeypatch):
     """Test handling of invalid API responses."""
     class MockMessage:
         def __init__(self, content):
-            self.content = content
+            self.content = "invalid json"
     
     class MockAnthropicMessages:
         def create(self, **kwargs):
-            return MockMessage("invalid json")
+            return MockMessage(None)
     
     class MockAnthropic:
         def __init__(self, api_key):
             self.messages = MockAnthropicMessages()
     
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy_key")
     monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
     
     extractor = KeyMomentsExtractor(sample_srt)
-    with pytest.raises(Exception, match="Failed to parse.*response"):
+    with pytest.raises(Exception, match="Failed to parse API response"):
         extractor.extract_key_moments()
