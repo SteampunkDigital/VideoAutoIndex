@@ -1,53 +1,37 @@
 # Video Auto Index
 
-Automatically process meeting videos to extract key moments, generate takeaways, and create an indexed webpage.
+Automatically process meeting videos to extract key moments, topics, and takeaways. The tool generates a navigable summary webpage with video chapters.
 
-## Setup
+## Features
 
-### Using Conda (Recommended)
+- Extracts audio from video files
+- Transcribes speech to text using faster-whisper
+- Analyzes content to identify:
+  - Major topics with timestamps
+  - Key moments within each topic
+  - Actionable takeaways
+- Adds chapter markers to the video
+- Generates an interactive HTML summary
+  - Clickable timestamps for video navigation
+  - Organized by topics
+  - Highlights key moments and takeaways
 
-1. Install Miniconda if you haven't already:
-   - Download from [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-   - Or via command line:
-     ```bash
-     # macOS
-     brew install --cask miniconda
-     
-     # Linux
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-     bash Miniconda3-latest-Linux-x86_64.sh
-     ```
+## Requirements
 
-2. Create and activate the conda environment:
-   ```bash
-   # Create environment from environment.yml
-   conda env create -f environment.yml
-   
-   # Activate environment
-   conda activate video-auto-index
-   ```
+- Python 3.8+
+- ffmpeg
+- Anthropic API key
 
-3. Verify installation:
-   ```bash
-   # Check ffmpeg
-   ffmpeg -version
-   
-   # Run tests
-   pytest -v
-   ```
-
-### Manual Setup (Alternative)
-
-If you prefer not to use conda, you can install dependencies manually:
+## Installation
 
 1. Install ffmpeg:
    ```bash
    # macOS
    brew install ffmpeg
-   
+
    # Ubuntu/Debian
    sudo apt-get install ffmpeg
-   
+
    # Windows
    # Download from https://ffmpeg.org/download.html
    ```
@@ -57,28 +41,113 @@ If you prefer not to use conda, you can install dependencies manually:
    pip install -r requirements.txt
    ```
 
-## Testing
+3. Set up your Anthropic API key:
+   ```bash
+   export ANTHROPIC_API_KEY='your-api-key'
+   ```
 
-The project uses pytest for unit testing. To run the tests:
+## Usage
 
+Process a video file:
 ```bash
-# Run all tests
-pytest
-
-# Run tests with verbose output
-pytest -v
-
-# Run tests for a specific module
-pytest tests/test_video_processor.py
-
-# Run tests and show coverage report
-pytest --cov=src
+python src/main.py path/to/video.mp4 [--output-dir output]
 ```
 
-### Writing Tests
+This will:
+1. Extract audio from the video
+2. Transcribe the audio
+3. Analyze the content for topics and key moments
+4. Add chapters to the video
+5. Generate an HTML summary page
 
-Tests are located in the `tests` directory. Each module in `src` has a corresponding test file in `tests`. For example:
-- `src/video_processor.py` → `tests/test_video_processor.py`
-- `src/transcriber.py` → `tests/test_transcriber.py`
+The output directory will contain:
+- `meeting_analysis.json`: Extracted topics, moments, and takeaways
+- `*_audio.wav`: Extracted audio file
+- `*.srt`: Generated subtitles
+- `*_chaptered.mp4`: Video file with chapter markers
+- `meeting_summary.html`: Interactive summary webpage
 
-When adding new functionality, please ensure to add corresponding tests.
+## Output Format
+
+The analysis JSON follows this structure:
+```json
+[
+  {
+    "topic": "Topic description",
+    "timestamp": "HH:MM:SS,mmm",
+    "key_moments": [
+      {
+        "description": "Key moment description",
+        "timestamp": "HH:MM:SS,mmm"
+      }
+    ],
+    "takeaways": [
+      "Actionable takeaway 1",
+      "Actionable takeaway 2"
+    ]
+  }
+]
+```
+
+## Development
+
+The project is organized into modular components:
+- `video_processor.py`: Handles video/audio operations
+- `transcriber.py`: Speech-to-text conversion
+- `key_moments.py`: Content analysis
+- `web_generator.py`: HTML summary generation
+- `main.py`: Pipeline orchestration
+
+Each component can be run independently, allowing for flexible processing pipelines.
+
+## Testing
+
+The project includes a comprehensive test suite covering all components:
+
+### Running Tests
+
+Run all tests:
+```bash
+pytest
+```
+
+Run with coverage report:
+```bash
+pytest --cov=src tests/
+```
+
+Run specific test categories:
+```bash
+# Unit tests only
+pytest -v -m "not integration"
+
+# Integration tests only
+pytest -v -m "integration"
+```
+
+### Test Structure
+
+- `test_video_processor.py`: Tests for video and audio processing
+- `test_transcriber.py`: Tests for speech-to-text conversion
+- `test_key_moments.py`: Tests for content analysis with API mocking
+- `test_web_generator.py`: Tests for HTML generation
+- `test_main.py`: Integration tests for the full pipeline
+
+### Test Coverage
+
+The test suite includes:
+- Unit tests for each component
+- Integration tests for the full pipeline
+- API mocking for external services
+- Fixture-based test data
+- Error handling verification
+- Edge case validation
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
