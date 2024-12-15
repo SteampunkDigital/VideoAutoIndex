@@ -19,27 +19,47 @@ class KeyMomentsExtractor:
 
     def extract_key_moments(self) -> List[Dict]:
         """
-        Extract key moments from the subtitle file using Claude.
+        Extract topics, key moments, and takeaways from the subtitle file using Claude.
         
         Returns:
-            List of dictionaries containing key moments with their timestamps and descriptions
+            List of topic dictionaries containing:
+            - topic: Brief topic description
+            - timestamp: Start time of the topic
+            - key_moments: List of important moments within this topic
+            - takeaways: List of actionable takeaways from this topic
         """
         # Read the subtitle file
         with open(self.subtitle_path, 'r') as f:
             subtitle_content = f.read()
 
         # Prepare the prompt for Claude
-        prompt = f"""Analyze this meeting transcript and identify the key moments. 
-        For each key moment, extract the timestamp and provide a concise description.
-        Format your response as a JSON array of objects with 'timestamp' and 'description' fields.
-        Only include significant moments that represent important discussions, decisions, or transitions in the meeting.
-        Ensure the timestamps match the exact SRT format from the transcript (HH:MM:SS,mmm).
-        
-        Example response format:
+        prompt = f"""Analyze this meeting transcript and break it down into major topics.
+        For each topic, identify its key moments and extract actionable takeaways.
+        Format your response as a JSON array where each object represents a topic section with this structure:
+
         [
-            {{"timestamp": "00:01:15,000", "description": "Team agreed on new project timeline"}},
-            {{"timestamp": "00:05:30,500", "description": "Budget constraints discussed and resolved"}}
+            {{
+                "topic": "Brief topic description",
+                "timestamp": "HH:MM:SS,mmm",
+                "key_moments": [
+                    {{
+                        "description": "Description of an important moment",
+                        "timestamp": "HH:MM:SS,mmm"
+                    }}
+                ],
+                "takeaways": [
+                    "Actionable takeaway or key decision 1",
+                    "Actionable takeaway or key decision 2"
+                ]
+            }}
         ]
+
+        Important:
+        - Each topic should be a distinct discussion point or agenda item
+        - Timestamps must match the exact SRT format from the transcript (HH:MM:SS,mmm)
+        - Key moments should capture significant points, decisions, or transitions
+        - Takeaways should be actionable items or important conclusions
+        - Keep descriptions concise but informative
 
         Transcript:
         {subtitle_content}
@@ -53,7 +73,7 @@ class KeyMomentsExtractor:
                 model="claude-3-opus-20240229",
                 max_tokens=4096,
                 temperature=0,
-                system="You are a meeting analyzer that extracts key moments from transcripts. You only respond with properly formatted JSON.",
+                system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
                 messages=[{
                     "role": "user",
                     "content": prompt
@@ -61,23 +81,44 @@ class KeyMomentsExtractor:
             )
             
             # Parse the response
-            key_moments = json.loads(response.content)
+            topics = json.loads(response.content)
             
             # Validate the response format
-            if not isinstance(key_moments, list):
-                raise ValueError("Expected a list of key moments")
+            if not isinstance(topics, list):
+                raise ValueError("Expected a list of topics")
             
-            for moment in key_moments:
-                if not isinstance(moment, dict) or 'timestamp' not in moment or 'description' not in moment:
-                    raise ValueError("Invalid key moment format")
+            for topic in topics:
+                if not isinstance(topic, dict):
+                    raise ValueError("Invalid topic format")
+                    
+                required_fields = ['topic', 'timestamp', 'key_moments', 'takeaways']
+                if not all(field in topic for field in required_fields):
+                    raise ValueError(f"Missing required fields in topic: {required_fields}")
                 
                 # Validate timestamp format
-                self._validate_timestamp_format(moment['timestamp'])
+                self._validate_timestamp_format(topic['timestamp'])
+                
+                # Validate key_moments
+                if not isinstance(topic['key_moments'], list):
+                    raise ValueError("Expected list of key moments")
+                for moment in topic['key_moments']:
+                    if not isinstance(moment, dict):
+                        raise ValueError("Invalid key moment format")
+                    if 'description' not in moment or 'timestamp' not in moment:
+                        raise ValueError("Missing required fields in key moment")
+                    self._validate_timestamp_format(moment['timestamp'])
+                
+                # Validate takeaways
+                if not isinstance(topic['takeaways'], list):
+                    raise ValueError("Expected list of takeaways")
+                for takeaway in topic['takeaways']:
+                    if not isinstance(takeaway, str):
+                        raise ValueError("Invalid takeaway format")
             
-            return key_moments
+            return topics
             
         except Exception as e:
-            raise Exception(f"Failed to extract key moments: {str(e)}")
+            raise Exception(f"Failed to extract topics and key moments: {str(e)}")
 
     def _validate_timestamp_format(self, timestamp: str) -> None:
         """

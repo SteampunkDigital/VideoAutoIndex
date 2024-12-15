@@ -2,6 +2,7 @@
 
 import os
 import sys
+import json
 import argparse
 import subprocess
 from pathlib import Path
@@ -64,26 +65,23 @@ def process_video(video_path: str, output_dir: str = "output"):
     transcriber = Transcriber(audio_path)
     subtitle_path = transcriber.transcribe(output_dir)
     
-    # Extract key moments from the subtitles
+    # Extract topics, key moments, and takeaways from the subtitles
     key_extractor = KeyMomentsExtractor(subtitle_path)
-    key_moments = key_extractor.extract_key_moments()
+    analysis = key_extractor.extract_key_moments()
     
-    # Save key moments to a JSON file
-    key_moments_path = os.path.join(output_dir, "key_moments.json")
-    with open(key_moments_path, "w") as f:
-        json.dump(key_moments, f, indent=2)
+    # Save analysis to a JSON file
+    analysis_path = os.path.join(output_dir, "meeting_analysis.json")
+    with open(analysis_path, "w") as f:
+        json.dump(analysis, f, indent=2)
     
-    print(f"\nKey moments extracted and saved to: {key_moments_path}")
+    print(f"\nMeeting analysis saved to: {analysis_path}")
     
     # TODO: Implement remaining steps:
-    # 4. Generate takeaways
-    # takeaways = extract_takeaways(key_moments)
+    # 4. Add chapters to video using topic timestamps
+    # chaptered_video = processor.add_chapters(analysis, output_dir)
     
-    # 5. Add chapters to video
-    # chaptered_video = processor.add_chapters(key_moments, output_dir)
-    
-    # 6. Generate webpage
-    # generate_webpage(key_moments, takeaways, chaptered_video, output_dir)
+    # 5. Generate webpage with topics, key moments, and takeaways
+    # generate_webpage(analysis, chaptered_video, output_dir)
 
 def main():
     # Check all dependencies before proceeding
