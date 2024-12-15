@@ -1,6 +1,8 @@
 ffmpeg-python==0.2.0
 faster-whisper==0.10.0
 flask==3.0.0
+anthropic==0.7.7
 pytest==7.4.3
 pytest-cov==4.1.0
-anthropic==0.7.7
+beautifulsoup4==4.12.3
+pytest-mock==3.12.0
