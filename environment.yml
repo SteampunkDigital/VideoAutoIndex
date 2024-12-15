@@ -3,17 +3,12 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.10
+  - python=3.11
   - pip
+  - mlx
   - pip:
-    - torch
-    - torchaudio
-    - numpy<2.0
+    - "numpy<2"
     - ffmpeg-python
     - flask
-    - transformers>=4.35.0
-    - optimum>=1.13.2
-    - accelerate>=0.24.1
-    - rich>=13.7.0
-    - setuptools>=68.2.2
     - anthropic
+    - whisper-mps

@@ -1,42 +1,42 @@
 import os
-import torch
-from transformers import pipeline
-from transformers.utils import is_flash_attn_2_available
+from whisper_mps.whisper import transcribe
 
 class Transcriber:
-    def __init__(self, audio_path: str, model_name: str = "openai/whisper-large-v3"):
+    # Map model sizes to their corresponding model names
+    MODEL_SIZES = {
+        "tiny": "tiny",
+        "base": "base",
+        "small": "small",
+        "medium": "medium",
+        "large": "large"
+    }
+
+    def __init__(self, audio_path: str, model_name: str = None, model_size: str = None):
         """
         Initialize the transcriber.
         
         Args:
             audio_path: Path to the input audio file
-            model_name: Name of the Whisper model to use (default: "openai/whisper-large-v3")
+            model_name: Not used with whisper-mps, kept for backward compatibility
+            model_size: Size of the Whisper model to use - tiny, base, small, medium, or large (default: None)
+                       If not provided, defaults to "medium" for better stability
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
         self.audio_path = audio_path
         
-        # Auto-detect device
-        if torch.backends.mps.is_available():
-            device = "mps"  # Use Apple Silicon GPU
-        elif torch.cuda.is_available():
-            device = "cuda:0"
+        # Determine which model to use
+        if model_size:
+            if model_size not in self.MODEL_SIZES:
+                raise ValueError(f"Invalid model size. Must be one of: {', '.join(self.MODEL_SIZES.keys())}")
+            self.model_size = self.MODEL_SIZES[model_size]
         else:
-            device = "cpu"
-            
-        # Initialize the pipeline with optimizations
-        self.pipe = pipeline(
-            "automatic-speech-recognition",
-            model=model_name,
-            torch_dtype=torch.float16,
-            device=device,
-            model_kwargs={"attn_implementation": "flash_attention_2"} if is_flash_attn_2_available() else {"attn_implementation": "sdpa"},
-        )
+            self.model_size = "medium"  # Default to medium model for better stability
 
     def transcribe(self, output_dir: str) -> str:
         """
-        Transcribe the audio file using whisper and generate a subtitle track data.
+        Transcribe the audio file and generate a subtitle track data.
         
         Args:
             output_dir: Directory to save the output files
@@ -52,26 +52,32 @@ class Transcriber:
         subtitle_filename = f"{os.path.splitext(audio_filename)[0]}.srt"
         subtitle_path = os.path.join(output_dir, subtitle_filename)
 
-        # Transcribe with optimized settings
-        result = self.pipe(
-            self.audio_path,
-            chunk_length_s=30,
-            batch_size=24,
-            return_timestamps=True,
-        )
+        print(f"Using whisper-mps with {self.model_size} model...")
+        
+        try:
+            # Transcribe with whisper-mps
+            result = transcribe(
+                self.audio_path,
+                model=self.model_size,
+                language="en",  # Force English for consistency
+            )
 
-        # Write the segments to the subtitle file
-        with open(subtitle_path, "w", encoding="utf-8") as f:
-            for i, chunk in enumerate(result["chunks"]):
-                start_time = self._format_time(chunk["timestamp"][0])
-                end_time = self._format_time(chunk["timestamp"][1])
-                transcript = chunk["text"].strip()
+            # Write the segments to the subtitle file
+            with open(subtitle_path, "w", encoding="utf-8") as f:
+                for i, segment in enumerate(result["segments"], 1):
+                    start_time = self._format_time(segment["start"])
+                    end_time = self._format_time(segment["end"])
+                    text = segment["text"].strip()
 
-                f.write(f"{i+1}\n")
-                f.write(f"{start_time} --> {end_time}\n")
-                f.write(f"{transcript}\n\n")
+                    f.write(f"{i}\n")
+                    f.write(f"{start_time} --> {end_time}\n")
+                    f.write(f"{text}\n\n")
 
-        return subtitle_path
+            return subtitle_path
+            
+        except Exception as e:
+            print(f"Error during transcription: {str(e)}")
+            raise
 
     @staticmethod
     def _format_time(seconds: float) -> str:
