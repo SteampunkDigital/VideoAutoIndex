@@ -28,7 +28,7 @@ def check_python_dependencies():
     """Check if required Python packages are installed."""
     try:
         import ffmpeg
-        import whisper_mps
+        import insanely_fast_whisper
         import anthropic
         import flask
         return True

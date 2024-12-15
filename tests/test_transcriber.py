@@ -17,6 +17,17 @@ def test_transcriber_init_invalid_path():
     with pytest.raises(FileNotFoundError):
         Transcriber("nonexistent_audio.wav", model_size="tiny")
 
+def test_transcriber_init_invalid_model():
+    """Test Transcriber initialization with invalid model size."""
+    audio_path = "dummy.wav"
+    with open(audio_path, "wb") as f:
+        f.write(b"dummy audio data")
+    
+    with pytest.raises(ValueError):
+        Transcriber(audio_path, model_size="invalid_size")
+    
+    os.remove(audio_path)
+
 @pytest.mark.integration
 def test_transcribe(sample_video, temp_dir):
     """Test full transcription pipeline with a sample video."""

@@ -11,4 +11,5 @@ dependencies:
     - ffmpeg-python
     - flask
     - anthropic
-    - whisper-mps
+    - faster-whisper
+    - insanely-fast-whisper

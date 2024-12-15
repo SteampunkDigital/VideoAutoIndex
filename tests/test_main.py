@@ -76,7 +76,7 @@ def test_check_python_dependencies_all_installed(monkeypatch):
 def test_check_python_dependencies_missing(monkeypatch):
     """Test Python dependencies check when a package is missing."""
     def mock_import(name, *args, **kwargs):
-        if name == "whisper_mps":
+        if name == "insanely_fast_whisper":
             raise ImportError(f"No module named '{name}'")
         return True
     
