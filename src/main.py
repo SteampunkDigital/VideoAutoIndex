@@ -9,6 +9,7 @@ from pathlib import Path
 from video_processor import VideoProcessor
 from transcriber import Transcriber
 from key_moments import KeyMomentsExtractor
+from web_generator import WebGenerator
 
 def check_ffmpeg():
     """Check if ffmpeg is installed and accessible."""
@@ -29,6 +30,7 @@ def check_python_dependencies():
         import ffmpeg
         import faster_whisper
         import anthropic
+        import flask
         return True
     except ImportError as e:
         missing_package = str(e).split("'")[1]
@@ -85,11 +87,14 @@ def process_video(video_path: str, output_dir: str = "output"):
     chaptered_video = processor.add_chapters(analysis, output_dir)
     print(f"   Chaptered video saved to: {chaptered_video}")
     
-    # TODO: Implement final step:
-    # 5. Generate webpage with topics, key moments, and takeaways
-    # generate_webpage(analysis, chaptered_video, output_dir)
+    # Generate webpage with analysis and video
+    print("5. Generating webpage...")
+    web_generator = WebGenerator(analysis_path, chaptered_video)
+    webpage_path = web_generator.generate(output_dir)
+    print(f"   Webpage saved to: {webpage_path}")
     
     print("\nProcessing complete!")
+    print(f"\nOpen {webpage_path} in your browser to view the meeting summary.")
 
 def main():
     # Check all dependencies before proceeding
