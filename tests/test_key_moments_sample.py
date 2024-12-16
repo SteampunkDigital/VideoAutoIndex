@@ -11,7 +11,7 @@ from src.key_moments import KeyMomentsExtractor
 def main():
     # Get the path to the sample transcript
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    transcript_path = os.path.join(script_dir, "do-not-share-sample_audio.srt")
+    transcript_path = os.path.join(script_dir, "sample_audio.srt")
     
     print(f"Using transcript: {transcript_path}")
     

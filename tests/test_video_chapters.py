@@ -11,8 +11,8 @@ from src.video_processor import VideoProcessor
 def main():
     # Get the paths to test files
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    video_path = os.path.join(script_dir, "..", "videos", "do-not-share-sample.mp4")
-    analysis_path = os.path.join(script_dir, "do-not-share-sample_meeting_analysis.json")
+    video_path = os.path.join(script_dir, "..", "videos", "sample.mp4")
+    analysis_path = os.path.join(script_dir, "sample_meeting_analysis.json")
     
     print(f"Using video: {video_path}")
     print(f"Using analysis: {analysis_path}")
