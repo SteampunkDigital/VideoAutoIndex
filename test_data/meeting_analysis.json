@@ -1,0 +1,25 @@
+[
+  {
+    "topic": "Scanning Demo with Sushi Example",
+    "timestamp": "00:00:00,000",
+    "key_moments": [
+      {
+        "description": "Initial presentation of sushi scan",
+        "timestamp": "00:00:00,000"
+      },
+      {
+        "description": "Comparison with real sushi photo revealed by chopsticks detail",
+        "timestamp": "00:00:07,260"
+      },
+      {
+        "description": "Discussion of 3D scanning speed and accessibility",
+        "timestamp": "00:00:27,800"
+      }
+    ],
+    "takeaways": [
+      "3D scanned models can be convincingly realistic at first glance",
+      "Real object can be distinguished by specific details (like chopsticks interaction)",
+      "Scanning process is quick and mobile-friendly"
+    ]
+  }
+]
