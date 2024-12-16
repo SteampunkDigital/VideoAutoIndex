@@ -67,14 +67,13 @@ class KeyMomentsExtractor:
         Transcript:
         {subtitle_content}
 
-        Respond only with the JSON array, no other text.
-        """
+        Respond only with the JSON array."""
 
         # Call Claude API
         try:
             response = self.anthropic.messages.create(
-                model="claude-3-opus-20240229",
-                max_tokens=4096,
+                model="claude-3-sonnet-20240229",
+                max_tokens=4096,  # Maximum allowed for Claude-3-Sonnet
                 temperature=0,
                 system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
                 messages=[{
@@ -84,10 +83,11 @@ class KeyMomentsExtractor:
             )
 
             try:
-                # Parse the response
-                topics = json.loads(response.content)
-            except json.JSONDecodeError:
-                raise Exception("Failed to parse API response: Invalid JSON format")
+                # Parse the response content as JSON
+                topics = json.loads(response.content[0].text)
+            except (json.JSONDecodeError, IndexError, AttributeError) as e:
+                print(f"Raw response content: {response.content}")
+                raise Exception(f"Failed to parse API response: {str(e)}")
 
             # Validate the response format
             if not isinstance(topics, list):
