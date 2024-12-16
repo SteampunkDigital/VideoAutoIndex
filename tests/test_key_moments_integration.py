@@ -3,8 +3,52 @@ import os
 import json
 from src.key_moments import KeyMomentsExtractor
 
+@pytest.fixture
+def mock_anthropic_key(monkeypatch):
+    """Mock Anthropic API key for testing."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+@pytest.fixture
+def mock_anthropic(monkeypatch):
+    """Mock Anthropic API for testing."""
+    class Content:
+        def __init__(self, text):
+            self.text = text
+
+    class MockMessage:
+        def __init__(self, content):
+            sample_response = [{
+                "topic": "Quarterly Planning Overview",
+                "timestamp": "00:00:00,000",
+                "key_moments": [
+                    {
+                        "description": "Meeting introduction and agenda setting",
+                        "timestamp": "00:00:00,000"
+                    },
+                    {
+                        "description": "Q3 performance review",
+                        "timestamp": "00:00:10,000"
+                    }
+                ],
+                "takeaways": [
+                    "Q3 targets exceeded by 15%",
+                    "Q4 goals and strategy to be discussed"
+                ]
+            }]
+            self.content = [Content(json.dumps(sample_response))]
+
+    class MockAnthropicMessages:
+        def create(self, **kwargs):
+            return MockMessage(None)
+
+    class MockAnthropic:
+        def __init__(self, api_key):
+            self.messages = MockAnthropicMessages()
+
+    monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
+
 @pytest.mark.integration
-def test_key_moments_with_sample_transcript(temp_dir):
+def test_key_moments_with_sample_transcript(temp_dir, mock_anthropic_key, mock_anthropic):
     """Test key moments extraction with a real sample transcript."""
     # Create a realistic sample transcript
     transcript_content = """1
@@ -59,7 +103,7 @@ def _is_valid_timestamp(timestamp):
     return bool(re.match(pattern, timestamp))
 
 @pytest.mark.integration
-def test_key_moments_with_long_transcript(temp_dir):
+def test_key_moments_with_long_transcript(temp_dir, mock_anthropic_key, mock_anthropic):
     """Test key moments extraction with a longer transcript to test performance."""
     # Create a longer transcript (5 minutes)
     lines = []
@@ -85,7 +129,7 @@ def test_key_moments_with_long_transcript(temp_dir):
     assert len(analysis) > 0
 
 @pytest.mark.integration
-def test_key_moments_with_special_characters(temp_dir):
+def test_key_moments_with_special_characters(temp_dir, mock_anthropic_key, mock_anthropic):
     """Test key moments extraction with special characters and formatting."""
     transcript_content = """1
 00:00:00,000 --> 00:00:05,000

@@ -9,6 +9,11 @@ def test_data_dir():
     return os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_data")
 
 @pytest.fixture
+def test_audio(test_data_dir):
+    """Get the test audio file path."""
+    return os.path.join(test_data_dir, "audio.wav")
+
+@pytest.fixture
 def sample_transcript(test_data_dir):
     """Load the actual test data transcript."""
     transcript_path = os.path.join(test_data_dir, "audio_transcript.json")
@@ -22,24 +27,19 @@ def sample_subtitles(test_data_dir):
     with open(subtitle_path, 'r') as f:
         return f.read()
 
-def test_transcriber_init(temp_dir):
+def test_transcriber_init(test_audio):
     """Test Transcriber initialization with valid audio file."""
-    # Create a dummy audio file
-    audio_path = os.path.join(temp_dir, "test_audio.wav")
-    with open(audio_path, "wb") as f:
-        f.write(b"dummy audio data")
-    
-    transcriber = Transcriber(audio_path)
-    assert transcriber.audio_path == audio_path
+    transcriber = Transcriber(test_audio)
+    assert transcriber.audio_path == test_audio
 
 def test_transcriber_init_invalid_path():
     """Test Transcriber initialization with non-existent audio file."""
     with pytest.raises(FileNotFoundError):
         Transcriber("nonexistent_audio.wav")
 
-def test_format_timestamp():
+def test_format_timestamp(test_audio):
     """Test timestamp formatting."""
-    transcriber = Transcriber("dummy.wav")  # Path doesn't matter for this test
+    transcriber = Transcriber(test_audio)
     
     test_cases = [
         (0.0, "00:00:00,000"),
@@ -53,9 +53,9 @@ def test_format_timestamp():
     for seconds, expected in test_cases:
         assert transcriber._format_timestamp(seconds) == expected
 
-def test_json_to_srt(temp_dir, sample_transcript, sample_subtitles):
+def test_json_to_srt(temp_dir, sample_transcript, sample_subtitles, test_audio):
     """Test JSON to SRT conversion using actual test data."""
-    transcriber = Transcriber("dummy.wav")  # Path doesn't matter for this test
+    transcriber = Transcriber(test_audio)
     
     # Write sample transcript to temp file
     json_path = os.path.join(temp_dir, "test_transcript.json")
@@ -108,7 +108,7 @@ def test_transcribe(sample_video, temp_dir):
         assert content.strip()
         # Basic SRT format validation
         lines = content.split('\n')
-        assert len(lines) >= 4
+        assert len(lines) >= 4  # At least one subtitle entry
         assert lines[0].isdigit()  # First line should be a number
         assert '-->' in lines[1]   # Second line should contain timestamp
         assert lines[2]            # Third line should contain text

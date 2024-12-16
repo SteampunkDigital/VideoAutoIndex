@@ -28,8 +28,12 @@ def sample_analysis(test_data_dir):
 @pytest.fixture
 def mock_anthropic_response(sample_analysis):
     """Mock Anthropic API response using actual test data."""
+    class Content:
+        def __init__(self, text):
+            self.text = text
+    
     return {
-        "content": json.dumps(sample_analysis)
+        "content": [Content(json.dumps(sample_analysis))]
     }
 
 def test_key_moments_init(sample_srt, mock_anthropic_key):
@@ -135,7 +139,7 @@ def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, mo
     """Test handling of invalid API responses."""
     class MockMessage:
         def __init__(self, content):
-            self.content = "invalid json"
+            self.content = [type('Content', (), {'text': 'invalid json'})()]
     
     class MockAnthropicMessages:
         def create(self, **kwargs):
