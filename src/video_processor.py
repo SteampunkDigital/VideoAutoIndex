@@ -82,15 +82,19 @@ class VideoProcessor:
                 f.write(f"title={topic['topic']}\n")
 
         try:
-            # Use ffmpeg-python for adding chapters
-            (
-                ffmpeg
-                .input(str(self.video_path))
-                .input(metadata_path)
-                .output(output_path, map_metadata=1, codec='copy')
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True)
+            # Use ffmpeg command-line style arguments
+            stream = ffmpeg.input(str(self.video_path))
+            stream = ffmpeg.output(
+                stream,
+                output_path,
+                **{
+                    'i': metadata_path,
+                    'map_metadata': 1,
+                    'codec': 'copy'
+                }
             )
+            stream = ffmpeg.overwrite_output(stream)
+            ffmpeg.run(stream, capture_stdout=True, capture_stderr=True)
             
             # Clean up metadata file
             os.remove(metadata_path)
