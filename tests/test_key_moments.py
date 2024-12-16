@@ -9,61 +9,27 @@ def mock_anthropic_key(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
 @pytest.fixture
-def sample_srt(temp_dir):
-    """Create a sample SRT file for testing."""
-    srt_content = """1
-00:00:00,000 --> 00:00:05,000
-Welcome to our project meeting.
-
-2
-00:00:05,000 --> 00:00:10,000
-Today we'll discuss the roadmap and budget.
-
-3
-00:00:10,000 --> 00:00:15,000
-First, let's review our progress.
-
-4
-00:00:15,000 --> 00:00:20,000
-We've completed phase one ahead of schedule.
-"""
-    srt_path = os.path.join(temp_dir, "test.srt")
-    with open(srt_path, "w") as f:
-        f.write(srt_content)
-    return srt_path
+def test_data_dir():
+    """Get the test_data directory path."""
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_data")
 
 @pytest.fixture
-def dummy_srt(temp_dir):
-    """Create a dummy SRT file for testing timestamp validation."""
-    srt_path = os.path.join(temp_dir, "dummy.srt")
-    with open(srt_path, "w") as f:
-        f.write("dummy content")
-    return srt_path
+def sample_srt(test_data_dir):
+    """Use the actual test data SRT file."""
+    return os.path.join(test_data_dir, "audio_subtitles.srt")
 
 @pytest.fixture
-def mock_anthropic_response():
-    """Mock Anthropic API response."""
+def sample_analysis(test_data_dir):
+    """Load the actual test data analysis."""
+    analysis_path = os.path.join(test_data_dir, "meeting_analysis.json")
+    with open(analysis_path, 'r') as f:
+        return json.load(f)
+
+@pytest.fixture
+def mock_anthropic_response(sample_analysis):
+    """Mock Anthropic API response using actual test data."""
     return {
-        "content": json.dumps([
-            {
-                "topic": "Project Status Update",
-                "timestamp": "00:00:00,000",
-                "key_moments": [
-                    {
-                        "description": "Meeting introduction",
-                        "timestamp": "00:00:00,000"
-                    },
-                    {
-                        "description": "Phase one completion announcement",
-                        "timestamp": "00:00:15,000"
-                    }
-                ],
-                "takeaways": [
-                    "Phase one completed ahead of schedule",
-                    "Need to discuss roadmap and budget"
-                ]
-            }
-        ])
+        "content": json.dumps(sample_analysis)
     }
 
 def test_key_moments_init(sample_srt, mock_anthropic_key):
@@ -76,9 +42,9 @@ def test_key_moments_init_invalid_path(mock_anthropic_key):
     with pytest.raises(FileNotFoundError):
         KeyMomentsExtractor("nonexistent.srt")
 
-def test_validate_timestamp_format(dummy_srt, mock_anthropic_key):
+def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     """Test timestamp format validation."""
-    extractor = KeyMomentsExtractor(dummy_srt)
+    extractor = KeyMomentsExtractor(sample_srt)
     
     # Valid timestamps
     extractor._validate_timestamp_format("00:00:00,000")
@@ -102,9 +68,9 @@ def test_validate_timestamp_format(dummy_srt, mock_anthropic_key):
         with pytest.raises(ValueError):
             extractor._validate_timestamp_format(timestamp)
 
-def test_parse_timestamp(dummy_srt, mock_anthropic_key):
+def test_parse_timestamp(sample_srt, mock_anthropic_key):
     """Test timestamp parsing to seconds."""
-    extractor = KeyMomentsExtractor(dummy_srt)
+    extractor = KeyMomentsExtractor(sample_srt)
     
     test_cases = [
         ("00:00:00,000", 0.0),
@@ -120,7 +86,7 @@ def test_parse_timestamp(dummy_srt, mock_anthropic_key):
 
 @pytest.mark.integration
 def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_response, monkeypatch):
-    """Test key moments extraction with mocked API."""
+    """Test key moments extraction with mocked API using real test data."""
     class MockMessage:
         def __init__(self, content):
             self.content = mock_anthropic_response["content"]
@@ -138,7 +104,7 @@ def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_resp
     extractor = KeyMomentsExtractor(sample_srt)
     result = extractor.extract_key_moments()
     
-    # Validate result structure
+    # Compare with actual test data structure
     assert isinstance(result, list)
     assert len(result) > 0
     
@@ -156,13 +122,13 @@ def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_resp
         extractor._validate_timestamp_format(moment["timestamp"])
 
 @pytest.mark.integration
-def test_extract_key_moments_no_api_key(dummy_srt):
+def test_extract_key_moments_no_api_key(sample_srt):
     """Test key moments extraction fails without API key."""
     if "ANTHROPIC_API_KEY" in os.environ:
         del os.environ["ANTHROPIC_API_KEY"]
     
     with pytest.raises(ValueError, match="ANTHROPIC_API_KEY.*required"):
-        KeyMomentsExtractor(dummy_srt)
+        KeyMomentsExtractor(sample_srt)
 
 @pytest.mark.integration
 def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, monkeypatch):

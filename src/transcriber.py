@@ -44,21 +44,16 @@ class Transcriber:
                 # Write text
                 f.write(f"{chunk['text'].strip()}\n\n")
 
-    def transcribe(self, output_dir: str) -> str:
+    def transcribe(self, transcript_path: str, subtitle_path: str):
         """
-        Transcribe audio to SRT subtitles.
+        Transcribe audio to JSON transcript and SRT subtitles.
         
         Args:
-            output_dir: Directory to save output files
-            
-        Returns:
-            Path to the generated SRT file
+            transcript_path: Path to save the JSON transcript
+            subtitle_path: Path to save the SRT subtitles
         """
-        os.makedirs(output_dir, exist_ok=True)
-        
-        base_name = os.path.splitext(os.path.basename(self.audio_path))[0]
-        json_path = os.path.join(output_dir, f"{base_name}_transcript.json")
-        srt_path = os.path.join(output_dir, f"{base_name}.srt")
+        os.makedirs(os.path.dirname(transcript_path), exist_ok=True)
+        os.makedirs(os.path.dirname(subtitle_path), exist_ok=True)
         
         print("Using insanely-fast-whisper...")
         print(f"Model: {self.model_name}")
@@ -68,7 +63,7 @@ class Transcriber:
             result = subprocess.run([
                 "insanely-fast-whisper",
                 "--file-name", self.audio_path,
-                "--transcript-path", json_path,
+                "--transcript-path", transcript_path,
                 "--language", "en",
                 "--device-id", "mps",
                 "--model", self.model_name,
@@ -79,15 +74,13 @@ class Transcriber:
             
             # Convert JSON to SRT format
             print("Converting transcript to SRT format...")
-            self._json_to_srt(json_path, srt_path)
-            
-            return srt_path
+            self._json_to_srt(transcript_path, subtitle_path)
             
         except subprocess.CalledProcessError as e:
             print(f"Error during transcription: {e.stderr}")
             raise
         except json.JSONDecodeError as e:
-            print(f"Error: Failed to parse JSON transcript at {json_path}")
+            print(f"Error: Failed to parse JSON transcript at {transcript_path}")
             print(f"JSON Error: {str(e)}")
             raise
         except Exception as e:

@@ -68,7 +68,9 @@ def process_video(video_path: str, output_dir: str = "output"):
     # Transcribe the extracted audio file
     print("2. Transcribing audio...")
     transcriber = Transcriber(audio_path)
-    subtitle_path = transcriber.transcribe(output_dir)
+    transcript_path = os.path.join(output_dir, "audio_transcript.json")
+    subtitle_path = os.path.join(output_dir, "audio_subtitles.srt")
+    transcriber.transcribe(transcript_path, subtitle_path)
     
     # Extract topics, key moments, and takeaways from the subtitles
     print("3. Analyzing content...")

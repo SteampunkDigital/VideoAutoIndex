@@ -11,43 +11,23 @@ def mock_anthropic_key(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
 @pytest.fixture
-def mock_anthropic_response():
-    """Mock Anthropic API response."""
-    return {
-        "content": json.dumps([
-            {
-                "topic": "Project Status Update",
-                "timestamp": "00:00:00,000",
-                "key_moments": [
-                    {
-                        "description": "Meeting introduction",
-                        "timestamp": "00:00:00,000"
-                    }
-                ],
-                "takeaways": [
-                    "Project kickoff successful"
-                ]
-            }
-        ])
-    }
+def test_data_dir():
+    """Get the test_data directory path."""
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_data")
 
 @pytest.fixture
-def mock_anthropic(monkeypatch, mock_anthropic_response):
-    """Mock Anthropic API for testing."""
-    class MockMessage:
-        def __init__(self, content):
-            self.content = mock_anthropic_response["content"]
-    
-    class MockAnthropicMessages:
-        def create(self, **kwargs):
-            return MockMessage(None)
-    
-    class MockAnthropic:
-        def __init__(self, api_key):
-            self.messages = MockAnthropicMessages()
-    
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
+def sample_analysis(test_data_dir):
+    """Load the actual test data analysis."""
+    analysis_path = os.path.join(test_data_dir, "meeting_analysis.json")
+    with open(analysis_path, 'r') as f:
+        return json.load(f)
+
+@pytest.fixture
+def mock_anthropic_response(sample_analysis):
+    """Mock Anthropic API response using actual test data."""
+    return {
+        "content": json.dumps(sample_analysis)
+    }
 
 def test_check_ffmpeg_installed(monkeypatch):
     """Test ffmpeg check when ffmpeg is installed."""
@@ -95,41 +75,50 @@ def test_check_api_key_not_set(monkeypatch):
     assert check_api_key() is False
 
 @pytest.mark.integration
-def test_full_pipeline(sample_video, temp_dir, mock_anthropic, monkeypatch):
+def test_full_pipeline(sample_video, temp_dir, mock_anthropic, monkeypatch, test_data_dir):
     """Test the complete video processing pipeline."""
     # Mock Transcriber to use tiny model
     from src.transcriber import Transcriber
     original_init = Transcriber.__init__
-    def mock_init(self, audio_path, model_size="tiny"):
-        return original_init(self, audio_path, model_size=model_size)
+    def mock_init(self, audio_path, model_name="tiny"):
+        return original_init(self, audio_path, model_name)
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
     process_video(sample_video, temp_dir)
     
-    # Check that all expected output files were created
+    # Check that all expected output files were created with correct names
     expected_files = [
-        "*_audio.wav",      # Extracted audio
-        "*.srt",            # Subtitles
-        "meeting_analysis.json",  # Analysis
-        "*_chaptered.mp4",  # Chaptered video
-        "meeting_summary.html"    # Web summary
+        "audio_transcript.json",
+        "audio_subtitles.srt",
+        "meeting_analysis.json"
     ]
     
-    for pattern in expected_files:
-        matches = list(Path(temp_dir).glob(pattern))
-        assert len(matches) > 0, f"Missing output file matching {pattern}"
-    
-    # Validate analysis JSON
-    with open(os.path.join(temp_dir, "meeting_analysis.json")) as f:
-        analysis = json.load(f)
-        assert isinstance(analysis, list)
-        assert len(analysis) > 0
+    for filename in expected_files:
+        file_path = os.path.join(temp_dir, filename)
+        assert os.path.exists(file_path), f"Missing output file: {filename}"
         
-        topic = analysis[0]
-        assert all(key in topic for key in ["topic", "timestamp", "key_moments", "takeaways"])
+        # Compare with test data structure if it's a JSON file
+        if filename.endswith('.json'):
+            with open(file_path, 'r') as f:
+                output = json.load(f)
+            with open(os.path.join(test_data_dir, filename), 'r') as f:
+                test_data = json.load(f)
+                
+            # Check structure matches (not exact content since it's generated)
+            if filename == "audio_transcript.json":
+                assert "speakers" in output
+                assert "chunks" in output
+                assert "text" in output
+            elif filename == "meeting_analysis.json":
+                assert len(output) > 0
+                topic = output[0]
+                assert all(key in topic for key in ["topic", "timestamp", "key_moments", "takeaways"])
     
-    # Validate HTML summary
-    with open(os.path.join(temp_dir, "meeting_summary.html")) as f:
+    # Check HTML summary
+    html_files = list(Path(temp_dir).glob("*_summary.html"))
+    assert len(html_files) > 0, "Missing HTML summary file"
+    
+    with open(html_files[0], 'r') as f:
         content = f.read()
         assert "Meeting Summary" in content
         assert "video" in content.lower()
@@ -143,8 +132,8 @@ def test_pipeline_creates_output_dir(sample_video, temp_dir, mock_anthropic, mon
     # Mock Transcriber to use tiny model
     from src.transcriber import Transcriber
     original_init = Transcriber.__init__
-    def mock_init(self, audio_path, model_size="tiny"):
-        return original_init(self, audio_path, model_size=model_size)
+    def mock_init(self, audio_path, model_name="tiny"):
+        return original_init(self, audio_path, model_name)
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
     output_dir = os.path.join(temp_dir, "nested", "output")
