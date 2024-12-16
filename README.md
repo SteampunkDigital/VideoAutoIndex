@@ -71,18 +71,17 @@ python src/main.py path/to/video.mp4 [--output-dir output]
 This will:
 1. Extract audio from the video
 2. Transcribe the audio using insanely-fast-whisper
-3. Analyze the content for topics and key moments
-4. Add chapters to the video
-5. Generate an HTML summary page
+3. Analyze the meeting content for topics and key moments
+4. Generate an HTML summary page
 
 The output directory will contain:
-- `*_analysis.json`: Extracted topics, moments, and takeaways
-- `*_audio.wav`: Extracted audio file
-- `*.srt`: Generated subtitles
-- `*_chaptered.mp4`: Video file with chapter markers
-- `*_summary.html`: Interactive summary webpage
+- `audio.wav`: Extracted audio file
+- `audio_transcript.json`: Transcribed speech with timestamps
+- `audio_subtitles.srt`: Generated subtitles
+- `meeting_analysis.json`: Extracted topics, moments, and takeaways
 
-
+Final web output is stored in:
+- `<video_base_path>/<video_filename>_summary.html`
 
 ## Output Format
 
@@ -111,7 +110,7 @@ The analysis JSON follows this structure:
 The project is organized into modular components:
 - `video_processor.py`: Handles video/audio operations
 - `transcriber.py`: Speech-to-text conversion using insanely-fast-whisper
-- `key_moments.py`: Content analysis
+- `key_moments.py`: AI content analysis
 - `web_generator.py`: HTML summary generation
 - `main.py`: Pipeline orchestration
 
