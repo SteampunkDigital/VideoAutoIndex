@@ -12,7 +12,7 @@ class WebGenerator:
         
         Args:
             analysis_path: Path to the JSON file containing meeting analysis
-            video_path: Path to the chaptered video file
+            video_path: Path to the video file
         """
         self.analysis_path = Path(analysis_path)
         self.video_path = Path(video_path)
@@ -22,12 +22,13 @@ class WebGenerator:
         if not self.video_path.exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")
 
-    def generate(self, output_dir: str) -> str:
+    def generate(self, output_dir: str, output_filename: str = "meeting_summary.html") -> str:
         """
         Generate a webpage with meeting analysis and video links.
         
         Args:
             output_dir: Directory to save the webpage
+            output_filename: Name of the output HTML file
             
         Returns:
             Path to the generated HTML file
@@ -39,25 +40,25 @@ class WebGenerator:
             analysis = json.load(f)
             
         # Get relative paths for assets
+        output_path = os.path.join(output_dir, output_filename)
         video_rel_path = os.path.relpath(self.video_path, output_dir)
             
         # Generate HTML
         html = self._generate_html(analysis, video_rel_path)
         
         # Write HTML file
-        output_path = os.path.join(output_dir, "meeting_summary.html")
         with open(output_path, "w") as f:
             f.write(html)
             
         return output_path
 
-    def _generate_html(self, analysis: List[Dict], video_path: str) -> str:
+    def _generate_html(self, analysis: List[Dict], video_rel_path: str) -> str:
         """
         Generate HTML content from the analysis.
         
         Args:
             analysis: List of topic dictionaries with moments and takeaways
-            video_path: Relative path to the video file
+            video_rel_path: Relative path to the video file
             
         Returns:
             Generated HTML content
@@ -134,7 +135,7 @@ class WebGenerator:
             
             <div class="video-container">
                 <video id="meeting-video" controls>
-                    <source src="{{ video_path }}" type="video/mp4">
+                    <source src="{{ video_rel_path }}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
             </div>
@@ -198,5 +199,5 @@ class WebGenerator:
             return render_template_string(
                 template,
                 analysis=analysis,
-                video_path=video_path
+                video_rel_path=video_rel_path
             )

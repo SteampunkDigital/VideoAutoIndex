@@ -53,7 +53,7 @@ def process_video(video_path: str, output_dir: str = "output"):
     
     Args:
         video_path: Path to the input video file
-        output_dir: Directory to store all output files
+        output_dir: Directory to store intermediate files
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -81,15 +81,14 @@ def process_video(video_path: str, output_dir: str = "output"):
         json.dump(analysis, f, indent=2)
     print(f"   Analysis saved to: {analysis_path}")
     
-    # Add chapters to video using topic timestamps
-    print("4. Adding chapters to video...")
-    chaptered_video = processor.add_chapters(analysis, output_dir)
-    print(f"   Chaptered video saved to: {chaptered_video}")
-    
     # Generate webpage with analysis and video
-    print("5. Generating webpage...")
-    web_generator = WebGenerator(analysis_path, chaptered_video)
-    webpage_path = web_generator.generate(output_dir)
+    print("4. Generating webpage...")
+    # Get the directory and base name of the input video
+    video_dir = os.path.dirname(video_path)
+    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    
+    web_generator = WebGenerator(analysis_path, video_path)
+    webpage_path = web_generator.generate(video_dir, f"{video_name}_summary.html")
     print(f"   Webpage saved to: {webpage_path}")
     
     print("\nProcessing complete!")
@@ -106,7 +105,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
-    parser.add_argument("--output-dir", default="output", help="Directory to store output files")
+    parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
     
     args = parser.parse_args()
     process_video(args.video_path, args.output_dir)
