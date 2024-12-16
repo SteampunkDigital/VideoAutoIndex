@@ -72,7 +72,7 @@ class KeyMomentsExtractor:
         # Call Claude API
         try:
             response = self.anthropic.messages.create(
-                model="claude-3-sonnet-20240229",
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=4096,  # Maximum allowed for Claude-3-Sonnet
                 temperature=0,
                 system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
