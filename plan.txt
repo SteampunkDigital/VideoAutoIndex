@@ -2,14 +2,19 @@ This project processes a video file of a meeting, to pull out the key moments of
 
 The processing steps are:
 1. Extract the audio from the video file
-2. Transcribe the audio to subtitles
+2. Transcribe the audio to subtitles using insanely-fast-whisper
+   - Uses Whisper large-v3 model by default
+   - Optimized for Apple Silicon with MPS backend
+   - Configurable batch size to manage memory usage
 3. Extract key moments, takeaways, and a short topic with timecode from the subtitles.
 4. Re-write the video file with the topic as chapters
 5. Write a webpage with topic heading, key moments, takeaways, and link to the video file at their timecodes.
 
 The project will be implemented in Python and use:
 - ffmpeg for video and audio processing
-- insanely fast whisper for the transcription
+- insanely-fast-whisper for fast, accurate transcription
+  - Integrated as a git submodule for version control
+  - Optimized for both CUDA and MPS (Apple Silicon)
 - ollama for the key moments extraction and key takeaway summarization
 - flask for the webpage generation
 

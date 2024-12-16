@@ -5,9 +5,11 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 ## Features
 
 - Extracts audio from video files
-- Transcribes speech to text using faster-whisper
-  - Uses large-v3 model by default for best accuracy
-  - Configurable model size for different use cases
+- Transcribes speech to text using insanely-fast-whisper
+  - Uses Whisper large-v3 model by default for best accuracy
+  - Optimized for both NVIDIA GPUs and Apple Silicon
+  - Flash Attention 2 support for NVIDIA GPUs
+  - Word-level timestamp support
 - Analyzes content to identify:
   - Major topics with timestamps
   - Key moments within each topic
@@ -22,7 +24,8 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 - Python 3.8+
 - ffmpeg
-- Anthropic API key
+- NVIDIA GPU or Apple Silicon Mac
+- pipx (recommended for insanely-fast-whisper installation)
 
 ## Installation
 
@@ -38,12 +41,22 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
    # Download from https://ffmpeg.org/download.html
    ```
 
-2. Install Python dependencies:
+2. Install pipx and insanely-fast-whisper:
+   ```bash
+   # Install pipx
+   brew install pipx  # macOS
+   python -m pip install pipx  # Other platforms
+
+   # Install insanely-fast-whisper
+   pipx install insanely-fast-whisper --force --pip-args="--ignore-requires-python"
+   ```
+
+3. Install Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Set up your Anthropic API key:
+4. Set up your Anthropic API key:
    ```bash
    export ANTHROPIC_API_KEY='your-api-key'
    ```
@@ -57,42 +70,19 @@ python src/main.py path/to/video.mp4 [--output-dir output]
 
 This will:
 1. Extract audio from the video
-2. Transcribe the audio using Whisper large-v3 model
+2. Transcribe the audio using insanely-fast-whisper
 3. Analyze the content for topics and key moments
 4. Add chapters to the video
 5. Generate an HTML summary page
 
 The output directory will contain:
-- `meeting_analysis.json`: Extracted topics, moments, and takeaways
+- `*_analysis.json`: Extracted topics, moments, and takeaways
 - `*_audio.wav`: Extracted audio file
 - `*.srt`: Generated subtitles
 - `*_chaptered.mp4`: Video file with chapter markers
-- `meeting_summary.html`: Interactive summary webpage
+- `*_summary.html`: Interactive summary webpage
 
-## Advanced Usage
 
-### Transcription Models
-
-The transcriber supports different Whisper model sizes:
-```python
-from src.transcriber import Transcriber
-
-# Use default large-v3 model for best accuracy
-transcriber = Transcriber(audio_path)
-
-# Use smaller model for faster processing
-transcriber = Transcriber(audio_path, model_size="medium")
-
-# Use tiny model for testing
-transcriber = Transcriber(audio_path, model_size="tiny")
-```
-
-Available model sizes:
-- `tiny`: Fastest, lowest accuracy
-- `base`: Fast, basic accuracy
-- `small`: Balanced speed/accuracy
-- `medium`: Good accuracy
-- `large-v3`: Best accuracy (default)
 
 ## Output Format
 
@@ -120,7 +110,7 @@ The analysis JSON follows this structure:
 
 The project is organized into modular components:
 - `video_processor.py`: Handles video/audio operations
-- `transcriber.py`: Speech-to-text conversion
+- `transcriber.py`: Speech-to-text conversion using insanely-fast-whisper
 - `key_moments.py`: Content analysis
 - `web_generator.py`: HTML summary generation
 - `main.py`: Pipeline orchestration
