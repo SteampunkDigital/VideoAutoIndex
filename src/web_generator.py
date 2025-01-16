@@ -41,7 +41,9 @@ class WebGenerator:
             
         # Get relative paths for assets
         output_path = os.path.join(output_dir, output_filename)
-        video_rel_path = os.path.relpath(self.video_path, output_dir)
+        # Calculate relative path from the final webpage location (which will be in video directory)
+        video_dir = os.path.dirname(self.video_path)
+        video_rel_path = os.path.basename(self.video_path)  # Just use the video filename since it will be in same directory
             
         # Generate HTML
         html = self._generate_html(analysis, video_rel_path)
