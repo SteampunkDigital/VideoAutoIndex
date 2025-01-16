@@ -5,12 +5,6 @@ channels:
 dependencies:
   - python=3.11
   - pip
-  - mlx
-  - pytest
-  - pytest-cov
-  - beautifulsoup4
   - pip:
-    - "numpy<2"
-    - ffmpeg-python
-    - flask
-    - anthropic
+    - "insanely-fast-whisper @ git+https://github.com/Vaibhavs10/insanely-fast-whisper"  # Install from git to bypass Python version check
+    - -e .[dev]  # Install package in editable mode with dev dependencies

@@ -46,10 +46,9 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
    # Create and activate the conda environment
    conda env create -f environment.yml
    conda activate video-auto-index
-
-   # Install insanely-fast-whisper
-   pip install insanely-fast-whisper --ignore-requires-python
    ```
+
+   This will automatically install all dependencies, including insanely-fast-whisper.
 
 3. Set up your Anthropic API key:
    ```bash
