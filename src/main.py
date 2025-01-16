@@ -91,8 +91,17 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     
     web_generator = WebGenerator(analysis_path, video_path)
-    webpage_path = web_generator.generate(video_dir, f"{video_name}_summary.html")
-    print(f"   Webpage saved to: {webpage_path}")
+    
+    # Generate in output directory
+    output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
+    
+    # Copy to video directory for proper video path resolution
+    webpage_path = os.path.join(video_dir, f"{video_name}_summary.html")
+    with open(output_webpage_path, 'r') as src, open(webpage_path, 'w') as dst:
+        dst.write(src.read())
+    
+    print(f"   Webpage saved to:")
+    print(f"   {webpage_path}")
     
     print("\nProcessing complete!")
     print(f"\nOpen {webpage_path} in your browser to view the meeting summary.")
