@@ -60,7 +60,24 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 Process a video file:
 ```bash
-python src/main.py path/to/video.mp4 [--output-dir output]
+python -m src.main [video path] [--output-dir output] [--device-id DEVICE]
+```
+
+Device options:
+- Default: Automatically uses MPS on Apple Silicon, CPU/CUDA on other systems
+- `--device-id 0`: Force CPU/CUDA device
+- `--device-id mps`: Force MPS device on Apple Silicon
+
+For example:
+```bash
+# Use default device (auto-detected)
+python -m src.main /path/to/video.mp4 --output-dir output
+
+# Force CPU/CUDA device
+python -m src.main /path/to/video.mp4 --output-dir output --device-id 0
+
+# Force MPS device on Apple Silicon
+python -m src.main /path/to/video.mp4 --output-dir output --device-id mps
 ```
 
 This will:

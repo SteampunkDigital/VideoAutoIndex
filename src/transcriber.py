@@ -1,21 +1,25 @@
 import os
 import json
 import subprocess
+import platform
 from datetime import timedelta
 
 class Transcriber:
-    def __init__(self, audio_path: str, model_name: str = "openai/whisper-large-v3-turbo"):
+    def __init__(self, audio_path: str, model_name: str = "openai/whisper-large-v3-turbo", device_id: str = None):
         """
         Initialize the transcriber.
         
         Args:
             audio_path: Path to the audio file
             model_name: Name of the Whisper model to use
+            device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon, defaults to "0")
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
         self.audio_path = audio_path
         self.model_name = model_name
+        # Default to "mps" on macOS/Apple Silicon, "0" otherwise
+        self.device_id = device_id or ("mps" if platform.system() == "Darwin" and platform.machine() == "arm64" else "0")
 
     def _format_timestamp(self, seconds: float) -> str:
         """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)."""
@@ -57,6 +61,7 @@ class Transcriber:
         
         print("Using insanely-fast-whisper...")
         print(f"Model: {self.model_name}")
+        print(f"Device: {self.device_id}")
         
         try:
             # Run transcription to get JSON output
@@ -65,7 +70,7 @@ class Transcriber:
                 "--file-name", self.audio_path,
                 "--transcript-path", transcript_path,
                 "--language", "en",
-                "--device-id", "mps",
+                "--device-id", self.device_id,
                 "--model", self.model_name,
                 "--task", "transcribe"
             ], check=True, capture_output=True, text=True)

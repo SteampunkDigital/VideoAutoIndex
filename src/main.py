@@ -47,13 +47,14 @@ def check_api_key():
         return False
     return True
 
-def process_video(video_path: str, output_dir: str = "output"):
+def process_video(video_path: str, output_dir: str = "output", device_id: str = None):
     """
     Main processing pipeline for video indexing.
     
     Args:
         video_path: Path to the input video file
         output_dir: Directory to store intermediate files
+        device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -67,7 +68,7 @@ def process_video(video_path: str, output_dir: str = "output"):
 
     # Transcribe the extracted audio file
     print("2. Transcribing audio...")
-    transcriber = Transcriber(audio_path)
+    transcriber = Transcriber(audio_path, device_id=device_id)
     transcript_path = os.path.join(output_dir, "audio_transcript.json")
     subtitle_path = os.path.join(output_dir, "audio_subtitles.srt")
     transcriber.transcribe(transcript_path, subtitle_path)
@@ -108,13 +109,10 @@ def main():
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
+    parser.add_argument("--device-id", help='Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)')
     
     args = parser.parse_args()
-    process_video(args.video_path, args.output_dir)
+    process_video(args.video_path, args.output_dir, args.device_id)
 
 if __name__ == "__main__":
-    # Add src directory to Python path
-    src_dir = os.path.dirname(os.path.abspath(__file__))
-    if src_dir not in sys.path:
-        sys.path.append(src_dir)
     main()
