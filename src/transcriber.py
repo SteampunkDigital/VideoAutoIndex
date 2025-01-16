@@ -1,10 +1,10 @@
 import os
 import json
-import subprocess
 from datetime import timedelta
+from faster_whisper import WhisperModel
 
 class Transcriber:
-    def __init__(self, audio_path: str, model_name: str = "openai/whisper-large-v3-turbo"):
+    def __init__(self, audio_path: str, model_name: str = "base"):
         """
         Initialize the transcriber.
         
@@ -55,34 +55,31 @@ class Transcriber:
         os.makedirs(os.path.dirname(transcript_path), exist_ok=True)
         os.makedirs(os.path.dirname(subtitle_path), exist_ok=True)
         
-        print("Using insanely-fast-whisper...")
-        print(f"Model: {self.model_name}")
-        
         try:
-            # Run transcription to get JSON output
-            result = subprocess.run([
-                "insanely-fast-whisper",
-                "--file-name", self.audio_path,
-                "--transcript-path", transcript_path,
-                "--language", "en",
-                "--device-id", "mps",
-                "--model", self.model_name,
-                "--task", "transcribe"
-            ], check=True, capture_output=True, text=True)
+            print(f"Using faster-whisper with model: {self.model_name}")
+            # Initialize model with CPU compute type
+            model = WhisperModel(self.model_name, device="cpu", compute_type="int8")
             
-            print(result.stdout)
+            # Transcribe audio
+            print("Transcribing audio...")
+            segments, _ = model.transcribe(self.audio_path, language="en")
             
-            # Convert JSON to SRT format
+            # Convert segments to JSON format
+            chunks = []
+            for segment in segments:
+                chunks.append({
+                    "timestamp": [segment.start, segment.end],
+                    "text": segment.text
+                })
+            
+            # Save JSON transcript
+            with open(transcript_path, 'w', encoding='utf-8') as f:
+                json.dump({"chunks": chunks}, f, indent=2)
+            
+            # Convert to SRT format
             print("Converting transcript to SRT format...")
             self._json_to_srt(transcript_path, subtitle_path)
             
-        except subprocess.CalledProcessError as e:
-            print(f"Error during transcription: {e.stderr}")
-            raise
-        except json.JSONDecodeError as e:
-            print(f"Error: Failed to parse JSON transcript at {transcript_path}")
-            print(f"JSON Error: {str(e)}")
-            raise
         except Exception as e:
-            print(f"Unexpected error during transcription: {str(e)}")
+            print(f"Error during transcription: {str(e)}")
             raise
