@@ -22,10 +22,10 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.11+
 - ffmpeg
 - NVIDIA GPU or Apple Silicon Mac
-- pipx (recommended for insanely-fast-whisper installation)
+- Conda (for environment management)
 
 ## Installation
 
@@ -41,22 +41,17 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
    # Download from https://ffmpeg.org/download.html
    ```
 
-2. Install pipx and insanely-fast-whisper:
+2. Set up the conda environment:
    ```bash
-   # Install pipx
-   brew install pipx  # macOS
-   python -m pip install pipx  # Other platforms
+   # Create and activate the conda environment
+   conda env create -f environment.yml
+   conda activate video-auto-index
 
    # Install insanely-fast-whisper
-   pipx install insanely-fast-whisper --force --pip-args="--ignore-requires-python"
+   pip install insanely-fast-whisper --ignore-requires-python
    ```
 
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. Set up your Anthropic API key:
+3. Set up your Anthropic API key:
    ```bash
    export ANTHROPIC_API_KEY='your-api-key'
    ```

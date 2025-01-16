@@ -6,10 +6,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "ffmpeg-python",
-        "faster-whisper",
         "flask",
         "anthropic",
         "beautifulsoup4",
     ],
-    python_requires=">=3.8",
+    python_requires=">=3.11",
 )

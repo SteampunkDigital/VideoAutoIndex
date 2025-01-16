@@ -2,10 +2,9 @@
 name = "video-auto-index"
 version = "0.1.0"
 description = "Process meeting videos to extract key moments and takeaways"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dependencies = [
     "ffmpeg-python",
-    "faster-whisper",
     "flask",
     "anthropic",
     "beautifulsoup4",
