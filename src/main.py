@@ -47,7 +47,7 @@ def check_api_key():
         return False
     return True
 
-def process_video(video_path: str, output_dir: str = "output", device_id: str = None):
+def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None):
     """
     Main processing pipeline for video indexing.
     
@@ -55,73 +55,78 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         video_path: Path to the input video file
         output_dir: Directory to store intermediate files
         device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)
+        skip_to: Stage to skip to ('transcribe', 'analyze', or 'generate')
     """
-    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
-    
     print("\nProcessing video...")
     
-    # Extract audio from the video file
-    print("1. Extracting audio...")
-    processor = VideoProcessor(video_path)
-    audio_path = processor.extract_audio(output_dir)
-
-    # Transcribe the extracted audio file
-    print("2. Transcribing audio...")
-    transcriber = Transcriber(audio_path, device_id=device_id)
+    audio_path = os.path.join(output_dir, f"{Path(video_path).stem}_audio.wav")
     transcript_path = os.path.join(output_dir, "audio_transcript.json")
     subtitle_path = os.path.join(output_dir, "audio_subtitles.srt")
-    transcriber.transcribe(transcript_path, subtitle_path)
-    
-    # Extract topics, key moments, and takeaways from the subtitles
-    print("3. Analyzing content...")
-    key_extractor = KeyMomentsExtractor(subtitle_path)
-    analysis = key_extractor.extract_key_moments()
-    
-    # Save analysis to a JSON file
     analysis_path = os.path.join(output_dir, "meeting_analysis.json")
-    with open(analysis_path, "w") as f:
-        json.dump(analysis, f, indent=2)
-    print(f"   Analysis saved to: {analysis_path}")
+
+    if not skip_to:
+        # Extract audio from the video file
+        print("1. Extracting audio...")
+        processor = VideoProcessor(video_path)
+        audio_path = processor.extract_audio(output_dir)
+
+    if not skip_to or skip_to == 'transcribe':
+        # Transcribe the extracted audio file
+        print("2. Transcribing audio...")
+        if not os.path.exists(audio_path):
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+        transcriber = Transcriber(audio_path, device_id=device_id)
+        transcriber.transcribe(transcript_path, subtitle_path)
     
-    # Generate webpage with analysis and video
-    print("4. Generating webpage...")
-    # Get the directory and base name of the input video
-    video_dir = os.path.dirname(video_path)
-    video_name = os.path.splitext(os.path.basename(video_path))[0]
+    if not skip_to or skip_to in ['analyze', 'transcribe']:
+        # Extract topics, key moments, and takeaways from the subtitles
+        print("3. Analyzing content...")
+        if not os.path.exists(subtitle_path):
+            raise FileNotFoundError(f"Subtitle file not found: {subtitle_path}")
+        key_extractor = KeyMomentsExtractor(subtitle_path)
+        analysis = key_extractor.extract_key_moments()
+        
+        # Save analysis to a JSON file
+        with open(analysis_path, "w") as f:
+            json.dump(analysis, f, indent=2)
+        print(f"   Analysis saved to: {analysis_path}")
     
-    web_generator = WebGenerator(analysis_path, video_path)
-    
-    # Generate in output directory
-    output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
-    
-    # Copy to video directory for proper video path resolution
-    webpage_path = os.path.join(video_dir, f"{video_name}_summary.html")
-    with open(output_webpage_path, 'r') as src, open(webpage_path, 'w') as dst:
-        dst.write(src.read())
-    
-    print(f"   Webpage saved to:")
-    print(f"   {webpage_path}")
+    if not skip_to or skip_to in ['generate', 'analyze', 'transcribe']:
+        # Generate webpage with analysis and video
+        print("4. Generating webpage...")
+        if not os.path.exists(analysis_path):
+            raise FileNotFoundError(f"Analysis file not found: {analysis_path}")
+        
+        video_dir = os.path.dirname(video_path)
+        video_name = os.path.splitext(os.path.basename(video_path))[0]
+        
+        web_generator = WebGenerator(analysis_path, video_path)
+        output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
+        
+        webpage_path = os.path.join(video_dir, f"{video_name}_summary.html")
+        with open(output_webpage_path, 'r') as src, open(webpage_path, 'w') as dst:
+            dst.write(src.read())
+        
+        print(f"   Webpage saved to:")
+        print(f"   {webpage_path}")
     
     print("\nProcessing complete!")
     print(f"\nOpen {webpage_path} in your browser to view the meeting summary.")
 
 def main():
-    # Check all dependencies before proceeding
-    if not all([
-        check_ffmpeg(),
-        check_python_dependencies(),
-        check_api_key()
-    ]):
+    if not all([check_ffmpeg(), check_python_dependencies(), check_api_key()]):
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
     parser.add_argument("--device-id", help='Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)')
+    parser.add_argument("--skip", choices=['transcribe', 'analyze', 'generate'], 
+                       help="Skip to a specific stage (transcribe, analyze, or generate)")
     
     args = parser.parse_args()
-    process_video(args.video_path, args.output_dir, args.device_id)
+    process_video(args.video_path, args.output_dir, args.device_id, args.skip)
 
 if __name__ == "__main__":
     main()
