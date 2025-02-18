@@ -23,6 +23,8 @@ class Transcriber:
 
     def _format_timestamp(self, seconds: float) -> str:
         """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)."""
+        if seconds is None:
+            return "00:00:00,000"  # Return default timestamp for None values
         td = timedelta(seconds=seconds)
         hours = td.seconds // 3600
         minutes = (td.seconds % 3600) // 60
@@ -40,9 +42,14 @@ class Transcriber:
                 # Write sequence number
                 f.write(f"{i}\n")
                 
-                # Write timestamps
-                start_time = self._format_timestamp(chunk['timestamp'][0])
-                end_time = self._format_timestamp(chunk['timestamp'][1])
+                # Validate and write timestamps
+                if not chunk.get('timestamp') or len(chunk['timestamp']) != 2:
+                    print(f"Warning: Invalid timestamp format in chunk {i}, using default")
+                    start_time = "00:00:00,000"
+                    end_time = "00:00:00,000"
+                else:
+                    start_time = self._format_timestamp(chunk['timestamp'][0])
+                    end_time = self._format_timestamp(chunk['timestamp'][1])
                 f.write(f"{start_time} --> {end_time}\n")
                 
                 # Write text
