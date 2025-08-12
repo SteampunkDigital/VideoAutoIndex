@@ -135,7 +135,7 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         video_dir = os.path.dirname(video_path)
         video_name = os.path.splitext(os.path.basename(video_path))[0]
         
-        web_generator = WebGenerator(analysis_path, video_path)
+        web_generator = WebGenerator(analysis_path, video_path, transcript_path)
         output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
         
         webpage_path = os.path.join(video_dir, f"{video_name}_summary.html")
