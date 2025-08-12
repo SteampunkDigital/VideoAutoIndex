@@ -1,28 +1,72 @@
 # key_moments.py
 import json
 import os
-from typing import List, Dict
+from typing import List, Dict, Optional, Literal
 from anthropic import Anthropic
+from openai import OpenAI
+import openai
+import anthropic
 
 class KeyMomentsExtractor:
-    def __init__(self, subtitle_path: str):
+    def __init__(self, subtitle_path: str, api_provider: Literal["anthropic", "openai"], api_key: str):
         """
         Initialize the key moments extractor.
         
         Args:
             subtitle_path: Path to the input subtitle file
+            api_provider: Which API to use ("anthropic" or "openai")
+            api_key: API key for the specified provider
         """
         if not os.path.exists(subtitle_path):
             raise FileNotFoundError(f"Subtitle file not found: {subtitle_path}")
             
         self.subtitle_path = subtitle_path
-        self.anthropic = Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
-        if not os.environ.get('ANTHROPIC_API_KEY'):
-            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+        self.api_provider = api_provider
+        
+        if api_provider == "anthropic":
+            self.anthropic = Anthropic(api_key=api_key)
+            self.openai = None
+        elif api_provider == "openai":
+            self.openai = OpenAI(api_key=api_key)
+            self.anthropic = None
+            self.openai_model = self._get_best_openai_model()
+        else:
+            raise ValueError("api_provider must be 'anthropic' or 'openai'")
 
+    def _get_best_openai_model(self) -> str:
+        """
+        Get the best available OpenAI model from the API.
+        Prioritizes: gpt-5, o3, gpt-4o
+        
+        Returns:
+            Model name string
+        """
+        try:
+            models_response = self.openai.models.list()
+            available_models = [model.id for model in models_response.data]
+            
+            # Preferred model order - top 3 models only
+            preferred_models = ["gpt-5", "o3", "gpt-4o"]
+            
+            for model in preferred_models:
+                if model in available_models:
+                    print(f"Using OpenAI model: {model}")
+                    return model
+            
+            # Fallback - should not happen given the models list
+            raise ValueError("None of the preferred OpenAI models (gpt-5, o3, gpt-4o) are available")
+            
+        except openai.AuthenticationError as e:
+            raise Exception(f"Cannot access OpenAI models - authentication failed. Please check your API key: {str(e)}")
+        except openai.RateLimitError as e:
+            raise Exception(f"Cannot access OpenAI models - rate limit exceeded. Please check your usage: {str(e)}")
+        except Exception as e:
+            print(f"Warning: Error fetching OpenAI models, using fallback: {e}")
+            return "gpt-4o"  # Safe fallback
+    
     def extract_key_moments(self) -> List[Dict]:
         """
-        Extract topics, key moments, and takeaways from the subtitle file using Claude.
+        Extract topics, key moments, and takeaways from the subtitle file using AI.
         
         Returns:
             List of topic dictionaries containing:
@@ -69,25 +113,65 @@ class KeyMomentsExtractor:
 
         Respond only with the JSON array."""
 
-        # Call Claude API
+        # Call AI API based on provider
         try:
-            response = self.anthropic.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=4096,  # Maximum allowed for Claude-3-Sonnet
-                temperature=0,
-                system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
-            )
+            if self.api_provider == "anthropic":
+                try:
+                    response = self.anthropic.messages.create(
+                        model="claude-opus-4-1-20250805",  # Latest and most capable Claude model
+                        max_tokens=16384,
+                        system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
+                        messages=[{
+                            "role": "user",
+                            "content": prompt
+                        }]
+                    )
+                    response_text = response.content[0].text
+                except anthropic.RateLimitError as e:
+                    raise Exception(f"Anthropic API rate limit exceeded. Please check your usage and billing: {str(e)}")
+                except anthropic.AuthenticationError as e:
+                    raise Exception(f"Anthropic API authentication failed. Please check your API key: {str(e)}")
+                except anthropic.APIConnectionError as e:
+                    raise Exception(f"Failed to connect to Anthropic API. Please check your internet connection: {str(e)}")
+                except anthropic.InternalServerError as e:
+                    raise Exception(f"Anthropic API internal server error. Please try again later: {str(e)}")
+                except anthropic.BadRequestError as e:
+                    raise Exception(f"Invalid request to Anthropic API: {str(e)}")
+                except Exception as e:
+                    raise Exception(f"Unexpected Anthropic API error: {str(e)}")
+            else:  # OpenAI
+                try:
+                    # Use max_completion_tokens for newer models, max_tokens for older ones
+                    api_params = {
+                        "model": self.openai_model,
+                        "messages": [
+                            {"role": "system", "content": "You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_completion_tokens": 16384
+                    }
+                    
+                    response = self.openai.chat.completions.create(**api_params)
+                    response_text = response.choices[0].message.content
+                except openai.RateLimitError as e:
+                    raise Exception(f"OpenAI API rate limit exceeded or quota reached. Please check your usage and billing: {str(e)}")
+                except openai.AuthenticationError as e:
+                    raise Exception(f"OpenAI API authentication failed. Please check your API key: {str(e)}")
+                except openai.APIConnectionError as e:
+                    raise Exception(f"Failed to connect to OpenAI API. Please check your internet connection: {str(e)}")
+                except openai.InternalServerError as e:
+                    raise Exception(f"OpenAI API internal server error. Please try again later: {str(e)}")
+                except openai.BadRequestError as e:
+                    raise Exception(f"Invalid request to OpenAI API: {str(e)}")
+                except Exception as e:
+                    raise Exception(f"Unexpected OpenAI API error: {str(e)}")
 
             try:
                 # Parse the response content as JSON
-                topics = json.loads(response.content[0].text)
+                topics = json.loads(response_text)
             except (json.JSONDecodeError, IndexError, AttributeError) as e:
-                print(f"Raw response content: {response.content}")
-                raise Exception(f"Failed to parse API response: {str(e)}")
+                print(f"Raw response content: {response_text}")
+                raise Exception(f"Failed to parse API response as JSON: {str(e)}")
 
             # Validate the response format
             if not isinstance(topics, list):
@@ -124,7 +208,11 @@ class KeyMomentsExtractor:
             return topics
             
         except Exception as e:
-            raise Exception(f"Failed to parse API response: {str(e)}")
+            # Re-raise with context if it's already a handled API error
+            if "API" in str(e) or "rate limit" in str(e).lower() or "quota" in str(e).lower():
+                raise
+            # Otherwise, wrap as general processing error
+            raise Exception(f"Failed to process meeting content: {str(e)}")
 
     def _validate_timestamp_format(self, timestamp: str) -> None:
         """
