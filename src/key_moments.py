@@ -117,7 +117,9 @@ class KeyMomentsExtractor:
         try:
             if self.api_provider == "anthropic":
                 try:
-                    response = self.anthropic.messages.create(
+                    # Use streaming for long operations (required for >10 min operations)
+                    response_text = ""
+                    with self.anthropic.messages.stream(
                         model="claude-opus-4-1-20250805",  # Latest and most capable Claude model
                         max_tokens=16384,
                         system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
@@ -125,8 +127,11 @@ class KeyMomentsExtractor:
                             "role": "user",
                             "content": prompt
                         }]
-                    )
-                    response_text = response.content[0].text
+                    ) as stream:
+                        for text in stream.text_stream:
+                            response_text += text
+                            print(".", end="", flush=True)  # Show progress
+                    print()  # New line after streaming
                 except anthropic.RateLimitError as e:
                     raise Exception(f"Anthropic API rate limit exceeded. Please check your usage and billing: {str(e)}")
                 except anthropic.AuthenticationError as e:
