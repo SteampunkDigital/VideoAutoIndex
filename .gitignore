@@ -33,6 +33,5 @@ ENV/
 
 # Project specific
 output/
-*.wav
 *.mp4
 *.mp3
