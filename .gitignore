@@ -32,6 +32,7 @@ ENV/
 *.swo
 
 # Project specific
+.env
 output/
 *.mp4
 *.mp3
