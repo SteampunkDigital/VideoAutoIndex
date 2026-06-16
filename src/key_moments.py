@@ -7,6 +7,8 @@ from openai import OpenAI
 import openai
 import anthropic
 
+DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+
 class KeyMomentsExtractor:
     def __init__(self, subtitle_path: str, api_provider: Literal["anthropic", "openai"], api_key: str):
         """
@@ -29,40 +31,10 @@ class KeyMomentsExtractor:
         elif api_provider == "openai":
             self.openai = OpenAI(api_key=api_key)
             self.anthropic = None
-            self.openai_model = self._get_best_openai_model()
+            self.openai_model = DEFAULT_OPENAI_MODEL
+            print(f"Using OpenAI model: {self.openai_model}")
         else:
             raise ValueError("api_provider must be 'anthropic' or 'openai'")
-
-    def _get_best_openai_model(self) -> str:
-        """
-        Get the best available OpenAI model from the API.
-        Prioritizes: gpt-5, o3, gpt-4o
-        
-        Returns:
-            Model name string
-        """
-        try:
-            models_response = self.openai.models.list()
-            available_models = [model.id for model in models_response.data]
-            
-            # Preferred model order - top 3 models only
-            preferred_models = ["gpt-5", "o3", "gpt-4o"]
-            
-            for model in preferred_models:
-                if model in available_models:
-                    print(f"Using OpenAI model: {model}")
-                    return model
-            
-            # Fallback - should not happen given the models list
-            raise ValueError("None of the preferred OpenAI models (gpt-5, o3, gpt-4o) are available")
-            
-        except openai.AuthenticationError as e:
-            raise Exception(f"Cannot access OpenAI models - authentication failed. Please check your API key: {str(e)}")
-        except openai.RateLimitError as e:
-            raise Exception(f"Cannot access OpenAI models - rate limit exceeded. Please check your usage: {str(e)}")
-        except Exception as e:
-            print(f"Warning: Error fetching OpenAI models, using fallback: {e}")
-            return "gpt-4o"  # Safe fallback
     
     def extract_key_moments(self) -> List[Dict]:
         """

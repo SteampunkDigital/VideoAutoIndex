@@ -1,7 +1,7 @@
 import pytest
 import os
 import json
-from src.key_moments import KeyMomentsExtractor
+from src.key_moments import DEFAULT_OPENAI_MODEL, KeyMomentsExtractor
 
 @pytest.fixture
 def mock_anthropic_key(monkeypatch):
@@ -28,27 +28,33 @@ def sample_analysis(test_data_dir):
 @pytest.fixture
 def mock_anthropic_response(sample_analysis):
     """Mock Anthropic API response using actual test data."""
-    class Content:
-        def __init__(self, text):
-            self.text = text
-    
-    return {
-        "content": [Content(json.dumps(sample_analysis))]
-    }
+    return json.dumps(sample_analysis)
 
 def test_key_moments_init(sample_srt, mock_anthropic_key):
     """Test KeyMomentsExtractor initialization with valid subtitle file."""
-    extractor = KeyMomentsExtractor(sample_srt)
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     assert extractor.subtitle_path == sample_srt
+    assert extractor.api_provider == "anthropic"
 
 def test_key_moments_init_invalid_path(mock_anthropic_key):
     """Test KeyMomentsExtractor initialization with non-existent subtitle file."""
     with pytest.raises(FileNotFoundError):
-        KeyMomentsExtractor("nonexistent.srt")
+        KeyMomentsExtractor("nonexistent.srt", api_provider="anthropic", api_key="test-key")
+
+def test_key_moments_openai_uses_default_model(sample_srt, monkeypatch):
+    """Test OpenAI initialization uses the current default model."""
+    class MockOpenAI:
+        def __init__(self, api_key):
+            self.api_key = api_key
+
+    monkeypatch.setattr("src.key_moments.OpenAI", MockOpenAI)
+
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="openai", api_key="test-key")
+    assert extractor.openai_model == DEFAULT_OPENAI_MODEL
 
 def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     """Test timestamp format validation."""
-    extractor = KeyMomentsExtractor(sample_srt)
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     
     # Valid timestamps
     extractor._validate_timestamp_format("00:00:00,000")
@@ -74,7 +80,7 @@ def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
 
 def test_parse_timestamp(sample_srt, mock_anthropic_key):
     """Test timestamp parsing to seconds."""
-    extractor = KeyMomentsExtractor(sample_srt)
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     
     test_cases = [
         ("00:00:00,000", 0.0),
@@ -91,13 +97,17 @@ def test_parse_timestamp(sample_srt, mock_anthropic_key):
 @pytest.mark.integration
 def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_response, monkeypatch):
     """Test key moments extraction with mocked API using real test data."""
-    class MockMessage:
-        def __init__(self, content):
-            self.content = mock_anthropic_response["content"]
+    class MockAnthropicStream:
+        def __enter__(self):
+            self.text_stream = [mock_anthropic_response]
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
     
     class MockAnthropicMessages:
-        def create(self, **kwargs):
-            return MockMessage(None)
+        def stream(self, **kwargs):
+            return MockAnthropicStream()
     
     class MockAnthropic:
         def __init__(self, api_key):
@@ -105,7 +115,7 @@ def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_resp
     
     monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
     
-    extractor = KeyMomentsExtractor(sample_srt)
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     result = extractor.extract_key_moments()
     
     # Compare with actual test data structure
@@ -126,24 +136,25 @@ def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_resp
         extractor._validate_timestamp_format(moment["timestamp"])
 
 @pytest.mark.integration
-def test_extract_key_moments_no_api_key(sample_srt):
-    """Test key moments extraction fails without API key."""
-    if "ANTHROPIC_API_KEY" in os.environ:
-        del os.environ["ANTHROPIC_API_KEY"]
-    
-    with pytest.raises(ValueError, match="ANTHROPIC_API_KEY.*required"):
-        KeyMomentsExtractor(sample_srt)
+def test_key_moments_invalid_provider(sample_srt):
+    """Test initialization fails with an invalid provider."""
+    with pytest.raises(ValueError, match="api_provider must be 'anthropic' or 'openai'"):
+        KeyMomentsExtractor(sample_srt, api_provider="invalid", api_key="test-key")
 
 @pytest.mark.integration
 def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, monkeypatch):
     """Test handling of invalid API responses."""
-    class MockMessage:
-        def __init__(self, content):
-            self.content = [type('Content', (), {'text': 'invalid json'})()]
+    class MockAnthropicStream:
+        def __enter__(self):
+            self.text_stream = ["invalid json"]
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
     
     class MockAnthropicMessages:
-        def create(self, **kwargs):
-            return MockMessage(None)
+        def stream(self, **kwargs):
+            return MockAnthropicStream()
     
     class MockAnthropic:
         def __init__(self, api_key):
@@ -151,6 +162,6 @@ def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, mo
     
     monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
     
-    extractor = KeyMomentsExtractor(sample_srt)
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     with pytest.raises(Exception, match="Failed to parse API response"):
         extractor.extract_key_moments()
