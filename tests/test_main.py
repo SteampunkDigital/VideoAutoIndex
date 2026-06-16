@@ -3,7 +3,7 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key
+from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key, create_transcriber
 
 @pytest.fixture
 def test_data_dir():
@@ -68,6 +68,29 @@ def test_check_api_key_not_set(monkeypatch):
     if "ANTHROPIC_API_KEY" in os.environ:
         monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert check_api_key() is False
+
+def test_create_transcriber_defaults_to_whisper(dummy_wav):
+    """Test default transcriber selection uses Whisper compatibility path."""
+    transcriber = create_transcriber(dummy_wav)
+
+    assert transcriber.__class__.__name__ == "Transcriber"
+
+def test_create_transcriber_qwen(dummy_wav):
+    """Test qwen transcriber selection uses Canary-Qwen CoreML class."""
+    transcriber = create_transcriber(dummy_wav, "qwen")
+
+    assert transcriber.__class__.__name__ == "CanaryQwenCoreMLTranscriber"
+
+def test_create_transcriber_dictation(dummy_wav):
+    """Test dictation transcriber selection uses Apple Speech wrapper."""
+    transcriber = create_transcriber(dummy_wav, "dictation")
+
+    assert transcriber.__class__.__name__ == "AppleDictationTranscriber"
+
+def test_create_transcriber_invalid_name(dummy_wav):
+    """Test invalid transcriber selection fails clearly."""
+    with pytest.raises(ValueError, match="transcriber_name"):
+        create_transcriber(dummy_wav, "invalid")
 
 @pytest.mark.xfail(reason="Anthropic API mocking needs to be fixed")
 @pytest.mark.integration

@@ -1,14 +1,21 @@
 #!/bin/bash
 
 # Script to run video auto-indexing
-# Usage: ./run.sh [video_file_path]
+# Usage: ./run.sh [video_file_path] [whisper|qwen|dictation]
+# Default transcriber: dictation (Apple Speech)
 
 # Set the conda environment and project directory
 CONDA_ENV="video-auto-index"
 VIDEO_FILE="${1}"
+TRANSCRIBER="${2:-dictation}"
 
 if [ -z "$VIDEO_FILE" ]; then
-    echo "Usage: ./run.sh [video_file_path]"
+    echo "Usage: ./run.sh [video_file_path] [whisper|qwen|dictation]"
+    exit 1
+fi
+
+if [ "$TRANSCRIBER" != "whisper" ] && [ "$TRANSCRIBER" != "qwen" ] && [ "$TRANSCRIBER" != "dictation" ]; then
+    echo "Error: transcriber must be 'whisper', 'qwen', or 'dictation'"
     exit 1
 fi
 
@@ -39,4 +46,4 @@ eval "$(conda shell.bash hook)"
 conda activate "$CONDA_ENV"
 
 # Run the Python script with the video file
-python -m src.main "$VIDEO_FILE" --openai
+python -m src.main "$VIDEO_FILE" --openai --transcriber "$TRANSCRIBER"

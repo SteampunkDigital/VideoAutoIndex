@@ -10,7 +10,12 @@ import anthropic
 DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
 
 class KeyMomentsExtractor:
-    def __init__(self, subtitle_path: str, api_provider: Literal["anthropic", "openai"], api_key: str):
+    def __init__(
+        self,
+        subtitle_path: str,
+        api_provider: Literal["anthropic", "openai"] = "anthropic",
+        api_key: Optional[str] = None,
+    ):
         """
         Initialize the key moments extractor.
         
@@ -24,6 +29,7 @@ class KeyMomentsExtractor:
             
         self.subtitle_path = subtitle_path
         self.api_provider = api_provider
+        api_key = api_key or os.environ.get("ANTHROPIC_API_KEY" if api_provider == "anthropic" else "OPENAI_API_KEY")
         
         if api_provider == "anthropic":
             self.anthropic = Anthropic(api_key=api_key)

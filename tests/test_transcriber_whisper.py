@@ -1,7 +1,7 @@
 import pytest
 import os
 import json
-from src.transcriber import Transcriber
+from src.transcriber_whisper import Transcriber
 
 @pytest.fixture
 def test_data_dir():

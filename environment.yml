@@ -7,4 +7,8 @@ dependencies:
   - pip
   - pip:
     - "insanely-fast-whisper @ git+https://github.com/Vaibhavs10/insanely-fast-whisper"  # Install from git to bypass Python version check
+    - "coremltools>=8.0; platform_system == 'Darwin'"
+    - "scikit-learn==1.5.1; platform_system == 'Darwin'"
+    - "huggingface-hub>=0.23.0"
+    - "transformers>=4.45.0"
     - -e .[dev]  # Install package in editable mode with dev dependencies

@@ -7,7 +7,6 @@ import argparse
 import subprocess
 from pathlib import Path
 from .video_processor import VideoProcessor
-from .transcriber import Transcriber
 from .key_moments import KeyMomentsExtractor
 from .web_generator import WebGenerator
 
@@ -39,6 +38,13 @@ def check_python_dependencies():
         print("pip install -r requirements.txt")
         return False
 
+def check_api_key():
+    """Check if the default Anthropic API key is available."""
+    if os.environ.get('ANTHROPIC_API_KEY'):
+        return True
+    print("Error: ANTHROPIC_API_KEY environment variable is not set")
+    return False
+
 def get_api_config(args):
     """Determine API provider and key from command line args and environment."""
     if args.anthropic is not None:  # --anthropic was used
@@ -61,8 +67,24 @@ def get_api_config(args):
     
     return provider, key
 
+def create_transcriber(audio_path: str, transcriber_name: str = "whisper", device_id: str = None):
+    """Create the configured audio transcriber."""
+    if transcriber_name == "whisper":
+        from .transcriber import Transcriber
+
+        return Transcriber(audio_path, device_id=device_id)
+    if transcriber_name == "qwen":
+        from .transcriber_canary_qwen_coreml import CanaryQwenCoreMLTranscriber
+
+        return CanaryQwenCoreMLTranscriber(audio_path)
+    if transcriber_name == "dictation":
+        from .transcriber_apple_dictation import AppleDictationTranscriber
+
+        return AppleDictationTranscriber(audio_path)
+    raise ValueError("transcriber_name must be 'whisper', 'qwen', or 'dictation'")
+
 def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None,
-                 api_provider: str = None, api_key: str = None):
+                 api_provider: str = None, api_key: str = None, transcriber_name: str = "whisper"):
     """
     Main processing pipeline for video indexing.
     
@@ -71,6 +93,7 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         output_dir: Directory to store intermediate files
         device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)
         skip_to: Stage to skip to ('transcribe', 'analyze', or 'generate')
+        transcriber_name: Audio transcriber to use ('whisper', 'qwen', or 'dictation')
     """
     os.makedirs(output_dir, exist_ok=True)
     print("\nProcessing video...")
@@ -91,7 +114,7 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         print("2. Transcribing audio...")
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        transcriber = Transcriber(audio_path, device_id=device_id)
+        transcriber = create_transcriber(audio_path, transcriber_name, device_id)
         transcriber.transcribe(transcript_path, subtitle_path)
     
     if not skip_to or skip_to in ['analyze', 'transcribe']:
@@ -153,6 +176,8 @@ def main():
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
     parser.add_argument("--device-id", help='Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)')
+    parser.add_argument("--transcriber", choices=["whisper", "qwen", "dictation"], default="whisper",
+                       help="Audio transcriber backend to use (default: whisper)")
     parser.add_argument("--skip", choices=['transcribe', 'analyze', 'generate'], 
                        help="Skip to a specific stage (transcribe, analyze, or generate)")
     
@@ -175,7 +200,7 @@ def main():
         sys.exit(1)
     
     process_video(args.video_path, args.output_dir, args.device_id, args.skip,
-                 api_provider, api_key)
+                 api_provider, api_key, args.transcriber)
 
 if __name__ == "__main__":
     main()
