@@ -124,19 +124,41 @@ class WebGenerator:
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     line-height: 1.6;
-                    max-width: 1200px;
+                    max-width: 1280px;
                     margin: 0 auto;
                     padding: 20px;
                     color: #333;
                 }
+                .page-layout {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
+                    grid-template-areas: "content video";
+                    gap: 28px;
+                    align-items: start;
+                }
+                .content-column {
+                    grid-area: content;
+                    min-width: 0;
+                }
                 .video-container {
-                    margin: 20px 0;
+                    grid-area: video;
+                    position: sticky;
+                    top: 20px;
+                    margin: 0;
+                    padding: 14px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
                 }
                 video {
-                    max-width: 100%;
+                    display: block;
+                    width: 100%;
+                    max-height: calc(100vh - 68px);
+                    background: #111;
+                    border-radius: 6px;
                 }
                 .topic {
-                    margin: 40px 0;
+                    margin: 0 0 28px;
                     padding: 20px;
                     background: #f8f9fa;
                     border-radius: 8px;
@@ -179,7 +201,7 @@ class WebGenerator:
                     margin: 20px 0 10px;
                 }
                 .transcript-section {
-                    margin: 40px 0;
+                    margin: 0;
                     padding: 20px;
                     background: #f8f9fa;
                     border-radius: 8px;
@@ -208,18 +230,35 @@ class WebGenerator:
                 .transcript-chunk.active .transcript-timestamp {
                     color: #bbdefb;
                 }
+                @media (max-width: 860px) {
+                    body {
+                        padding: 14px;
+                    }
+                    .page-layout {
+                        grid-template-columns: 1fr;
+                        grid-template-areas:
+                            "video"
+                            "content";
+                        gap: 24px;
+                    }
+                    .video-container {
+                        position: static;
+                    }
+                    video {
+                        width: auto;
+                        max-width: 100%;
+                        height: min(50vh, 520px);
+                        max-height: 520px;
+                        margin: 0 auto;
+                    }
+                }
             </style>
         </head>
         <body>
             <h1>Meeting Summary</h1>
-            
-            <div class="video-container">
-                <video id="meeting-video" controls>
-                    <source src="{{ video_rel_path }}" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
 
+            <div class="page-layout">
+                <main class="content-column">
             <div class="topics">
                 {% for topic in analysis %}
                 <div class="topic">
@@ -270,6 +309,16 @@ class WebGenerator:
                 </div>
             </div>
             {% endif %}
+
+                </main>
+
+                <aside class="video-container">
+                    <video id="meeting-video" controls>
+                        <source src="{{ video_rel_path }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </aside>
+            </div>
 
             <script>
                 function seekVideo(timestamp) {

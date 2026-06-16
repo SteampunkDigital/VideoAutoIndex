@@ -37,3 +37,4 @@ output/
 *.mp4
 !docs/**/*.mp4
 *.mp3
+.coverage
