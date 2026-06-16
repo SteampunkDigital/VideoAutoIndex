@@ -2,6 +2,10 @@
 
 Automatically process meeting videos to extract key moments, topics, and takeaways. The tool generates a navigable summary webpage with video chapters.
 
+## Demo
+
+View the GitHub Pages demo: https://steampunkdigital.github.io/VideoAutoIndex/demo/
+
 ## Features
 
 - Extracts audio from video files

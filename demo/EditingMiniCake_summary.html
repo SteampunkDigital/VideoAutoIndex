@@ -1,0 +1,261 @@
+
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Meeting Summary</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    line-height: 1.6;
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    color: #333;
+                }
+                .video-container {
+                    margin: 20px 0;
+                }
+                video {
+                    max-width: 100%;
+                }
+                .topic {
+                    margin: 40px 0;
+                    padding: 20px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                }
+                .topic h2 {
+                    margin-top: 0;
+                    color: #2c3e50;
+                }
+                .timestamp {
+                    color: #666;
+                    font-family: monospace;
+                    background: #eee;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .timestamp:hover {
+                    background: #ddd;
+                }
+                .key-moments {
+                    margin: 20px 0;
+                }
+                .key-moment {
+                    margin: 10px 0;
+                    padding: 10px;
+                    background: white;
+                    border-left: 4px solid #3498db;
+                }
+                .takeaways {
+                    margin: 20px 0;
+                }
+                .takeaway {
+                    margin: 10px 0;
+                    padding: 10px;
+                    background: white;
+                    border-left: 4px solid #2ecc71;
+                }
+                h3 {
+                    color: #34495e;
+                    margin: 20px 0 10px;
+                }
+                .transcript-section {
+                    margin: 40px 0;
+                    padding: 20px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                }
+                .transcript-chunk {
+                    margin: 5px 0;
+                    padding: 8px 12px;
+                    background: white;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: background-color 0.2s;
+                }
+                .transcript-chunk:hover {
+                    background: #e3f2fd;
+                }
+                .transcript-chunk.active {
+                    background: #2196f3;
+                    color: white;
+                }
+                .transcript-timestamp {
+                    font-family: monospace;
+                    color: #666;
+                    font-size: 0.9em;
+                    margin-right: 10px;
+                }
+                .transcript-chunk.active .transcript-timestamp {
+                    color: #bbdefb;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Meeting Summary</h1>
+            
+            <div class="video-container">
+                <video id="meeting-video" controls>
+                    <source src="EditingMiniCake.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+
+            <div class="topics">
+                
+                <div class="topic">
+                    <h2>
+                        3-D scan cleaning and editing tools
+                        <span class="timestamp" onclick="seekVideo('00:00:00,000')">
+                            00:00:00,000
+                        </span>
+                    </h2>
+
+                    <div class="key-moments">
+                        <h3>Key Moments</h3>
+                        
+                        <div class="key-moment">
+                            Introduction of tools for cleaning 3-D scans
+                            <span class="timestamp" onclick="seekVideo('00:00:00,000')">
+                                00:00:00,000
+                            </span>
+                        </div>
+                        
+                    </div>
+
+                    <div class="takeaways">
+                        <h3>Key Takeaways</h3>
+                        
+                        <div class="takeaway">
+                            Use the eraser tool to remove parts of the 3-D model
+                        </div>
+                        
+                        <div class="takeaway">
+                            Utilize the cropping tool with adjustable boundaries
+                        </div>
+                        
+                        <div class="takeaway">
+                            Use the alignment tool to adjust rotation and tilt
+                        </div>
+                        
+                    </div>
+                </div>
+                
+            </div>
+
+            
+            <div class="transcript-section">
+                <h2>Full Transcript</h2>
+                <div class="transcript">
+                    
+                    <div class="transcript-chunk" 
+                         data-start="0" 
+                         data-end="6.549"
+                         onclick="seekToTime(0)">
+                        <span class="transcript-timestamp">00:00:00,000</span>
+                        3-D scans don&#39;t always come out as clean as you&#39;d expect but in the monocle prime up there&#39;s a few tools to help in this
+                    </div>
+                    
+                    <div class="transcript-chunk" 
+                         data-start="6.603" 
+                         data-end="13.152"
+                         onclick="seekToTime(6.603)">
+                        <span class="transcript-timestamp">00:00:06,602</span>
+                        3-D model. The glass stand can be easily removed with the eraser tool just like this and now there&#39;s a cropping tool wit
+                    </div>
+                    
+                    <div class="transcript-chunk" 
+                         data-start="13.152" 
+                         data-end="19.701"
+                         onclick="seekToTime(13.152)">
+                        <span class="transcript-timestamp">00:00:13,151</span>
+                        h adjustable top and bottom and all four sides the box finds the model boundaries if it&#39;s sitting off angle, there&#39;s als
+                    </div>
+                    
+                    <div class="transcript-chunk" 
+                         data-start="19.701" 
+                         data-end="24.994"
+                         onclick="seekToTime(19.701)">
+                        <span class="transcript-timestamp">00:00:19,701</span>
+                        o a new alignment tool where you could adjust rotation and tilt left to right all of these tools.
+                    </div>
+                    
+                    <div class="transcript-chunk" 
+                         data-start="25.049" 
+                         data-end="28.76"
+                         onclick="seekToTime(25.049)">
+                        <span class="transcript-timestamp">00:00:25,048</span>
+                        Make your 3-D scans cleaner and easier to edit check up monocle 3-d.
+                    </div>
+                    
+                    <div class="transcript-chunk" 
+                         data-start="28.76" 
+                         data-end="30.015"
+                         onclick="seekToTime(28.76)">
+                        <span class="transcript-timestamp">00:00:28,760</span>
+                        com for detail details.
+                    </div>
+                    
+                </div>
+            </div>
+            
+
+            <script>
+                function seekVideo(timestamp) {
+                    const video = document.getElementById('meeting-video');
+                    const seconds = parseTimestamp(timestamp);
+                    video.currentTime = seconds;
+                    video.play();
+                }
+
+                function seekToTime(seconds) {
+                    const video = document.getElementById('meeting-video');
+                    video.currentTime = seconds;
+                    video.play();
+                }
+
+                function parseTimestamp(timestamp) {
+                    // Convert HH:MM:SS,mmm to seconds
+                    const [time, ms] = timestamp.split(',');
+                    const [hours, minutes, seconds] = time.split(':').map(Number);
+                    return hours * 3600 + minutes * 60 + seconds + Number(ms) / 1000;
+                }
+
+                // Highlight current transcript segment during playback
+                function updateTranscriptHighlight() {
+                    const video = document.getElementById('meeting-video');
+                    const currentTime = video.currentTime;
+                    const chunks = document.querySelectorAll('.transcript-chunk');
+                    
+                    chunks.forEach(chunk => {
+                        const startTime = parseFloat(chunk.dataset.start);
+                        const endTime = parseFloat(chunk.dataset.end);
+                        
+                        if (currentTime >= startTime && currentTime <= endTime) {
+                            chunk.classList.add('active');
+                        } else {
+                            chunk.classList.remove('active');
+                        }
+                    });
+                }
+
+
+                // Set up video event listeners
+                document.addEventListener('DOMContentLoaded', function() {
+                    const video = document.getElementById('meeting-video');
+                    if (video) {
+                        // Update transcript highlight as video plays
+                        video.addEventListener('timeupdate', updateTranscriptHighlight);
+                        
+                        // Also update on seeking
+                        video.addEventListener('seeked', updateTranscriptHighlight);
+                    }
+                });
+            </script>
+        </body>
+        </html>
+        
