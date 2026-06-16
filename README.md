@@ -4,7 +4,10 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 ## Demo
 
-View the GitHub Pages demo: https://steampunkdigital.github.io/VideoAutoIndex/demo/
+View the GitHub Pages demo: https://steampunkdigital.github.io/VideoAutoIndex/
+
+The demo is published from `docs/`, so GitHub Pages should be configured to deploy
+from the `main` branch with `/docs` as the Pages folder.
 
 ## Features
 
