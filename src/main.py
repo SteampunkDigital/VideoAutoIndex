@@ -47,6 +47,8 @@ def check_api_key():
 
 def get_api_config(args):
     """Determine API provider and key from command line args and environment."""
+    if getattr(args, "apple", False):
+        return "apple", None
     if args.anthropic is not None:  # --anthropic was used
         provider = "anthropic"
         key = args.anthropic if args.anthropic else os.environ.get('ANTHROPIC_API_KEY')
@@ -62,7 +64,7 @@ def get_api_config(args):
             print("Provide via --openai [key] or set OPENAI_API_KEY environment variable")
             return None, None
     else:
-        print("Error: Must specify either --anthropic or --openai")
+        print("Error: Must specify --anthropic, --openai, or --apple")
         return None, None
     
     return provider, key
@@ -187,6 +189,8 @@ def main():
                           help="Use Anthropic Claude (optional key, falls back to ANTHROPIC_API_KEY env var)")
     api_group.add_argument("--openai", nargs='?', const='',
                           help="Use OpenAI GPT (optional key, falls back to OPENAI_API_KEY env var)")
+    api_group.add_argument("--apple", action="store_true",
+                          help="Use Apple Foundation Models on this Mac (no API key required)")
     
     args = parser.parse_args()
     
@@ -196,7 +200,7 @@ def main():
     
     # Get API configuration
     api_provider, api_key = get_api_config(args)
-    if not api_provider or not api_key:
+    if not api_provider:
         sys.exit(1)
     
     process_video(args.video_path, args.output_dir, args.device_id, args.skip,

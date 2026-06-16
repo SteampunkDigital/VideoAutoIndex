@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>local.video-auto-index.apple-dictation-transcriber</string>
+  <key>CFBundleName</key>
+  <string>Apple Dictation Transcriber</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>VideoAutoIndex uses Apple Dictation to transcribe audio from videos.</string>
+</dict>
+</plist>

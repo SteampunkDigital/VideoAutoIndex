@@ -3,7 +3,7 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key, create_transcriber
+from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key, create_transcriber, get_api_config
 
 @pytest.fixture
 def test_data_dir():
@@ -68,6 +68,15 @@ def test_check_api_key_not_set(monkeypatch):
     if "ANTHROPIC_API_KEY" in os.environ:
         monkeypatch.delenv("ANTHROPIC_API_KEY")
     assert check_api_key() is False
+
+def test_get_api_config_apple_does_not_require_key():
+    """Test Apple Foundation Models selection does not require an API key."""
+    class Args:
+        apple = True
+        anthropic = None
+        openai = None
+
+    assert get_api_config(Args()) == ("apple", None)
 
 def test_create_transcriber_defaults_to_whisper(dummy_wav):
     """Test default transcriber selection uses Whisper compatibility path."""

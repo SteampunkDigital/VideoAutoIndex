@@ -52,6 +52,20 @@ def test_key_moments_openai_uses_default_model(sample_srt, monkeypatch):
     extractor = KeyMomentsExtractor(sample_srt, api_provider="openai", api_key="test-key")
     assert extractor.openai_model == DEFAULT_OPENAI_MODEL
 
+def test_key_moments_apple_init_does_not_require_api_key(sample_srt, monkeypatch):
+    """Test Apple Foundation Models initialization avoids cloud API clients."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="apple")
+
+    assert extractor.api_provider == "apple"
+    assert extractor.source_path.name == "apple_foundation_key_moments.swift"
+    assert extractor.info_plist_path.name == "apple_foundation_key_moments_Info.plist"
+    assert extractor.binary_path.name == "apple_foundation_key_moments"
+    assert extractor.anthropic is None
+    assert extractor.openai is None
+
 def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     """Test timestamp format validation."""
     extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
@@ -138,7 +152,7 @@ def test_extract_key_moments(sample_srt, mock_anthropic_key, mock_anthropic_resp
 @pytest.mark.integration
 def test_key_moments_invalid_provider(sample_srt):
     """Test initialization fails with an invalid provider."""
-    with pytest.raises(ValueError, match="api_provider must be 'anthropic' or 'openai'"):
+    with pytest.raises(ValueError, match="api_provider must be 'anthropic', 'openai', or 'apple'"):
         KeyMomentsExtractor(sample_srt, api_provider="invalid", api_key="test-key")
 
 @pytest.mark.integration
@@ -165,3 +179,30 @@ def test_extract_key_moments_invalid_response(sample_srt, mock_anthropic_key, mo
     extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
     with pytest.raises(Exception, match="Failed to parse API response"):
         extractor.extract_key_moments()
+
+def test_extract_key_moments_apple_runs_swift_helper(sample_srt, sample_analysis, monkeypatch):
+    """Test Apple provider delegates analysis to the Swift helper binary."""
+    captured = {}
+
+    def mock_run(command, check, capture_output, text):
+        captured["command"] = command
+        captured["check"] = check
+        captured["capture_output"] = capture_output
+        captured["text"] = text
+        output_path = command[command.index("--output") + 1]
+        with open(output_path, "w") as f:
+            json.dump(sample_analysis, f)
+        return None
+
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="apple")
+    monkeypatch.setattr(extractor, "_ensure_binary", lambda: None)
+    monkeypatch.setattr("src.key_moments.subprocess.run", mock_run)
+
+    result = extractor.extract_key_moments()
+
+    assert result == sample_analysis
+    assert captured["command"][:3] == [str(extractor.binary_path), "--srt", sample_srt]
+    assert "--output" in captured["command"]
+    assert captured["check"] is True
+    assert captured["capture_output"] is True
+    assert captured["text"] is True
