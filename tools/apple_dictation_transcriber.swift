@@ -14,6 +14,12 @@ struct Transcript: Codable {
     let text: String
 }
 
+struct TextSpan {
+    let text: String
+    let startOffset: Int
+    let endOffset: Int
+}
+
 enum ToolError: Error, CustomStringConvertible {
     case missingArgument(String)
     case unsupportedRuntime
@@ -128,7 +134,13 @@ struct AppleDictationTranscriberTool {
 
         let effectiveLocale = supportedEquivalent ?? locale
         debugLog("effective locale=\(effectiveLocale.identifier)")
-        let transcriber = DictationTranscriber(locale: effectiveLocale, preset: .timeIndexedLongDictation)
+        let transcriber = DictationTranscriber(
+            locale: effectiveLocale,
+            contentHints: [.farField],
+            transcriptionOptions: [.punctuation],
+            reportingOptions: [],
+            attributeOptions: [.audioTimeRange]
+        )
         let modules: [any SpeechModule] = [transcriber]
 
         debugLog("checking AssetInventory status")
@@ -168,13 +180,11 @@ struct AppleDictationTranscriberTool {
                 let start = max(0.0, CMTimeGetSeconds(result.range.start))
                 let duration = max(0.0, CMTimeGetSeconds(result.range.duration))
                 let end = max(start, start + duration)
-                debugLog("result chunk start=\(roundToMillis(start)) end=\(roundToMillis(end)) chars=\(text.count)")
-                chunks.append(
-                    TranscriptChunk(
-                        timestamp: [roundToMillis(start), roundToMillis(end)],
-                        text: text
-                    )
+                let splitChunks = splitResultText(text, start: start, end: end)
+                debugLog(
+                    "result chunk start=\(roundToMillis(start)) end=\(roundToMillis(end)) chars=\(text.count) split=\(splitChunks.count)"
                 )
+                chunks.append(contentsOf: splitChunks)
             }
             debugLog("result stream finished chunks=\(chunks.count)")
             return chunks
@@ -187,6 +197,167 @@ struct AppleDictationTranscriberTool {
         let merged = mergeAdjacentDuplicates(resultTaskChunks)
         debugLog("merged adjacent duplicates input=\(resultTaskChunks.count) output=\(merged.count)")
         return merged
+    }
+
+    static func splitResultText(_ text: String, start: Double, end: Double) -> [TranscriptChunk] {
+        let cleaned = normalizeWhitespace(text)
+        guard !cleaned.isEmpty else {
+            return []
+        }
+
+        let duration = max(0.0, end - start)
+        let spans = splitIntoReadableSpans(cleaned)
+        guard !spans.isEmpty else {
+            return [
+                TranscriptChunk(
+                    timestamp: [roundToMillis(start), roundToMillis(end)],
+                    text: cleaned
+                )
+            ]
+        }
+
+        let totalCount = max(1, cleaned.count)
+        return spans.map { span in
+            let spanStart = start + duration * (Double(span.startOffset) / Double(totalCount))
+            let spanEnd = start + duration * (Double(span.endOffset) / Double(totalCount))
+            return TranscriptChunk(
+                timestamp: [roundToMillis(spanStart), roundToMillis(max(spanStart, spanEnd))],
+                text: span.text
+            )
+        }
+    }
+
+    static func splitIntoReadableSpans(_ text: String) -> [TextSpan] {
+        let maxCharacters = 120
+        let minSentenceCharacters = 24
+        var spans: [TextSpan] = []
+        var spanStart = 0
+        var lastBoundary: Int?
+        var currentIndex = 0
+
+        for character in text {
+            currentIndex += 1
+            if isSentenceBoundary(character) {
+                lastBoundary = currentIndex
+            }
+
+            if currentIndex - spanStart >= maxCharacters {
+                let splitAt: Int
+                if let boundary = lastBoundary, boundary - spanStart >= minSentenceCharacters {
+                    splitAt = boundary
+                } else if let wordBreak = lastWhitespaceOffset(in: text, from: spanStart, through: currentIndex),
+                          wordBreak - spanStart >= minSentenceCharacters {
+                    splitAt = wordBreak
+                } else {
+                    splitAt = currentIndex
+                }
+                appendSpan(text, startOffset: spanStart, endOffset: splitAt, to: &spans)
+                spanStart = skipSpaces(text, from: splitAt)
+                lastBoundary = nil
+            } else if let boundary = lastBoundary, boundary - spanStart >= minSentenceCharacters {
+                appendSpan(text, startOffset: spanStart, endOffset: boundary, to: &spans)
+                spanStart = skipSpaces(text, from: boundary)
+                lastBoundary = nil
+            }
+        }
+
+        appendSpan(text, startOffset: spanStart, endOffset: text.count, to: &spans)
+        return splitLongSpans(spans, maxCharacters: maxCharacters)
+    }
+
+    static func splitLongSpans(_ spans: [TextSpan], maxCharacters: Int) -> [TextSpan] {
+        var output: [TextSpan] = []
+        for span in spans {
+            if span.text.count <= maxCharacters {
+                output.append(span)
+                continue
+            }
+
+            var localStart = 0
+            while localStart < span.text.count {
+                let remaining = span.text.count - localStart
+                var localEnd = localStart + min(maxCharacters, remaining)
+                if localEnd < span.text.count,
+                   let wordBreak = lastWhitespaceOffset(in: span.text, from: localStart, through: localEnd),
+                   wordBreak > localStart {
+                    localEnd = wordBreak
+                }
+                appendSpan(
+                    span.text,
+                    startOffset: localStart,
+                    endOffset: localEnd,
+                    globalOffset: span.startOffset,
+                    to: &output
+                )
+                localStart = skipSpaces(span.text, from: localEnd)
+            }
+        }
+        return output
+    }
+
+    static func appendSpan(
+        _ text: String,
+        startOffset: Int,
+        endOffset: Int,
+        globalOffset: Int = 0,
+        to spans: inout [TextSpan]
+    ) {
+        guard endOffset > startOffset else {
+            return
+        }
+        let startIndex = text.index(text.startIndex, offsetBy: startOffset)
+        let endIndex = text.index(text.startIndex, offsetBy: endOffset)
+        let spanText = String(text[startIndex..<endIndex])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !spanText.isEmpty else {
+            return
+        }
+        spans.append(
+            TextSpan(
+                text: spanText,
+                startOffset: globalOffset + startOffset,
+                endOffset: globalOffset + endOffset
+            )
+        )
+    }
+
+    static func normalizeWhitespace(_ text: String) -> String {
+        text.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+    }
+
+    static func isSentenceBoundary(_ character: Character) -> Bool {
+        character == "." || character == "?" || character == "!" || character == "\n"
+    }
+
+    static func skipSpaces(_ text: String, from offset: Int) -> Int {
+        var next = offset
+        while next < text.count {
+            let index = text.index(text.startIndex, offsetBy: next)
+            if !text[index].isWhitespace {
+                break
+            }
+            next += 1
+        }
+        return next
+    }
+
+    static func lastWhitespaceOffset(in text: String, from start: Int, through end: Int) -> Int? {
+        guard end > start else {
+            return nil
+        }
+
+        var offset = start
+        var lastWhitespace: Int?
+        for character in text {
+            if offset > end {
+                break
+            }
+            if offset >= start && character.isWhitespace {
+                lastWhitespace = offset
+            }
+            offset += 1
+        }
+        return lastWhitespace
     }
 
     static func mergeAdjacentDuplicates(_ chunks: [TranscriptChunk]) -> [TranscriptChunk] {
