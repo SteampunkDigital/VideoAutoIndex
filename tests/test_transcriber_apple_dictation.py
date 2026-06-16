@@ -12,6 +12,9 @@ def test_apple_dictation_init(dummy_wav):
 
     assert transcriber.audio_path == dummy_wav
     assert transcriber.locale == "en-US"
+    assert transcriber.source_path.name == "apple_dictation_transcriber.swift"
+    assert transcriber.info_plist_path.name == "apple_dictation_transcriber_Info.plist"
+    assert transcriber.binary_path.name == "apple_dictation_transcriber"
 
 
 def test_apple_dictation_init_invalid_path():

@@ -18,9 +18,9 @@ class AppleDictationTranscriber:
         self.audio_path = audio_path
         self.locale = locale
         self.project_root = Path(__file__).resolve().parents[1]
-        self.source_path = self.project_root / "tools" / "apple_speechrecognizer_transcriber.swift"
-        self.info_plist_path = self.project_root / "tools" / "apple_speechrecognizer_transcriber_Info.plist"
-        self.binary_path = self.project_root / ".build" / "apple_speechrecognizer_transcriber"
+        self.source_path = self.project_root / "tools" / "apple_dictation_transcriber.swift"
+        self.info_plist_path = self.project_root / "tools" / "apple_dictation_transcriber_Info.plist"
+        self.binary_path = self.project_root / ".build" / "apple_dictation_transcriber"
 
     def transcribe(self, transcript_path: str, subtitle_path: str):
         self._ensure_binary()
@@ -51,7 +51,7 @@ class AppleDictationTranscriber:
                 for part in (error.stdout, error.stderr)
                 if part and part.strip()
             )
-            message = f"Apple SpeechRecognizer transcriber failed with exit code {error.returncode}."
+            message = f"Apple DictationTranscriber failed with exit code {error.returncode}."
             if details:
                 message = f"{message}\n{details}"
             raise RuntimeError(message) from error

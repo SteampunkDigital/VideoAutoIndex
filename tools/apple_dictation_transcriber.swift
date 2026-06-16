@@ -31,6 +31,11 @@ enum ToolError: Error, CustomStringConvertible {
     }
 }
 
+func debugLog(_ message: String) {
+    let timestamp = ISO8601DateFormatter().string(from: Date())
+    fputs("[apple-dictation \(timestamp)] \(message)\n", stderr)
+}
+
 @main
 struct AppleDictationTranscriberTool {
     static func main() async {
@@ -44,6 +49,7 @@ struct AppleDictationTranscriberTool {
 
     static func run() async throws {
         let args = parseArguments(CommandLine.arguments.dropFirst())
+        debugLog("started argv=\(CommandLine.arguments.dropFirst().joined(separator: " "))")
         guard let audioPath = args["audio"] else {
             throw ToolError.missingArgument("Missing required argument: --audio")
         }
@@ -58,12 +64,21 @@ struct AppleDictationTranscriberTool {
         guard FileManager.default.fileExists(atPath: audioPath) else {
             throw ToolError.invalidAudioPath(audioPath)
         }
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: audioPath),
+           let size = attrs[.size] as? NSNumber {
+            debugLog("audio path=\(audioPath) bytes=\(size)")
+        } else {
+            debugLog("audio path=\(audioPath) bytes=unknown")
+        }
+        debugLog("outputs transcript=\(transcriptPath) srt=\(srtPath) locale=\(localeIdentifier)")
 
         if #available(macOS 26.0, *) {
+            debugLog("runtime macOS 26 API path available")
             let chunks = try await transcribe(
                 audioURL: URL(fileURLWithPath: audioPath),
                 locale: Locale(identifier: localeIdentifier)
             )
+            debugLog("transcription returned chunks=\(chunks.count)")
             let transcript = Transcript(
                 speakers: [],
                 chunks: chunks,
@@ -82,7 +97,9 @@ struct AppleDictationTranscriberTool {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             try encoder.encode(transcript).write(to: URL(fileURLWithPath: transcriptPath))
+            debugLog("wrote transcript json")
             try writeSRT(chunks: chunks, to: URL(fileURLWithPath: srtPath))
+            debugLog("wrote srt")
         } else {
             throw ToolError.unsupportedRuntime
         }
@@ -103,24 +120,42 @@ struct AppleDictationTranscriberTool {
 
     @available(macOS 26.0, *)
     static func transcribe(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
-        let transcriber = DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
+        debugLog("creating DictationTranscriber locale=\(locale.identifier) preset=timeIndexedLongDictation")
+        let supportedEquivalent = await DictationTranscriber.supportedLocale(equivalentTo: locale)
+        debugLog("DictationTranscriber.supportedLocale=\(String(describing: supportedEquivalent))")
+        let installedLocales = await DictationTranscriber.installedLocales
+        debugLog("DictationTranscriber.installedLocales=\(installedLocales.map(\.identifier).sorted())")
+
+        let effectiveLocale = supportedEquivalent ?? locale
+        debugLog("effective locale=\(effectiveLocale.identifier)")
+        let transcriber = DictationTranscriber(locale: effectiveLocale, preset: .timeIndexedLongDictation)
         let modules: [any SpeechModule] = [transcriber]
 
+        debugLog("checking AssetInventory status")
         let status = await AssetInventory.status(forModules: modules)
+        debugLog("AssetInventory.status=\(status)")
         if status != .installed {
+            debugLog("requesting asset installation")
             if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
+                debugLog("downloading/installing speech assets")
                 try await request.downloadAndInstall()
+                debugLog("asset installation completed")
+            } else {
+                debugLog("asset installation request unavailable")
             }
         }
 
+        debugLog("opening audio file")
         let audioFile = try AVAudioFile(forReading: audioURL)
-        let analyzer = try await SpeechAnalyzer(
-            inputAudioFile: audioFile,
-            modules: modules,
-            finishAfterFile: true
+        debugLog(
+            "audio format sampleRate=\(audioFile.processingFormat.sampleRate) channels=\(audioFile.processingFormat.channelCount) frames=\(audioFile.length)"
         )
+        debugLog("constructing SpeechAnalyzer")
+        let analyzer = SpeechAnalyzer(modules: modules)
+        debugLog("SpeechAnalyzer constructed")
 
         var resultTaskChunks: [TranscriptChunk] = []
+        debugLog("starting result stream task")
         let resultTask = Task {
             var chunks: [TranscriptChunk] = []
             for try await result in transcriber.results {
@@ -133,6 +168,7 @@ struct AppleDictationTranscriberTool {
                 let start = max(0.0, CMTimeGetSeconds(result.range.start))
                 let duration = max(0.0, CMTimeGetSeconds(result.range.duration))
                 let end = max(start, start + duration)
+                debugLog("result chunk start=\(roundToMillis(start)) end=\(roundToMillis(end)) chars=\(text.count)")
                 chunks.append(
                     TranscriptChunk(
                         timestamp: [roundToMillis(start), roundToMillis(end)],
@@ -140,12 +176,17 @@ struct AppleDictationTranscriberTool {
                     )
                 )
             }
+            debugLog("result stream finished chunks=\(chunks.count)")
             return chunks
         }
 
+        debugLog("starting analyzer")
         try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
+        debugLog("analyzer completed; awaiting result task")
         resultTaskChunks = try await resultTask.value
-        return mergeAdjacentDuplicates(resultTaskChunks)
+        let merged = mergeAdjacentDuplicates(resultTaskChunks)
+        debugLog("merged adjacent duplicates input=\(resultTaskChunks.count) output=\(merged.count)")
+        return merged
     }
 
     static func mergeAdjacentDuplicates(_ chunks: [TranscriptChunk]) -> [TranscriptChunk] {
