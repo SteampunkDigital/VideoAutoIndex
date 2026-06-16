@@ -17,6 +17,7 @@ dependencies = [
     "scikit-learn==1.5.1; platform_system == 'Darwin'",
     "huggingface-hub>=0.23.0",
     "transformers>=4.45.0",
+    "safetensors>=0.4.3",
 ]
 
 [project.optional-dependencies]

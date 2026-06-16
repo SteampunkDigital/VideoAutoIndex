@@ -1,0 +1,299 @@
+import AVFoundation
+import Foundation
+import Speech
+
+struct TranscriptChunk: Codable {
+    let timestamp: [Double]
+    let text: String
+}
+
+struct Transcript: Codable {
+    let speakers: [String]
+    let chunks: [TranscriptChunk]
+    let text: String
+}
+
+enum ToolError: Error, CustomStringConvertible {
+    case missingArgument(String)
+    case invalidAudioPath(String)
+    case recognizerUnavailable(String)
+    case authorizationDenied(String)
+    case recognitionFailed(String)
+
+    var description: String {
+        switch self {
+        case .missingArgument(let message):
+            return message
+        case .invalidAudioPath(let path):
+            return "Audio file not found: \(path)"
+        case .recognizerUnavailable(let locale):
+            return "Apple speech recognition is not available for locale \(locale)."
+        case .authorizationDenied(let status):
+            return """
+            Apple speech recognition authorization is \(status). \
+            Enable Speech Recognition for the terminal/IDE running this tool in System Settings > Privacy & Security > Speech Recognition.
+            """
+        case .recognitionFailed(let message):
+            return "Apple speech recognition failed: \(message)"
+        }
+    }
+}
+
+@main
+struct AppleSpeechRecognizerTranscriberTool {
+    static func main() async {
+        do {
+            try await run()
+        } catch {
+            fputs("Error: \(error)\n", stderr)
+            exit(1)
+        }
+    }
+
+    static func run() async throws {
+        let args = parseArguments(CommandLine.arguments.dropFirst())
+        guard let audioPath = args["audio"] else {
+            throw ToolError.missingArgument("Missing required argument: --audio")
+        }
+        guard let transcriptPath = args["transcript"] else {
+            throw ToolError.missingArgument("Missing required argument: --transcript")
+        }
+        guard let srtPath = args["srt"] else {
+            throw ToolError.missingArgument("Missing required argument: --srt")
+        }
+        let localeIdentifier = args["locale"] ?? "en-US"
+
+        guard FileManager.default.fileExists(atPath: audioPath) else {
+            throw ToolError.invalidAudioPath(audioPath)
+        }
+
+        let chunks = try await transcribe(
+            audioURL: URL(fileURLWithPath: audioPath),
+            locale: Locale(identifier: localeIdentifier)
+        )
+        let transcript = Transcript(
+            speakers: [],
+            chunks: chunks,
+            text: chunks.map(\.text).joined(separator: " ")
+        )
+
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: transcriptPath).deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: URL(fileURLWithPath: srtPath).deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try encoder.encode(transcript).write(to: URL(fileURLWithPath: transcriptPath))
+        try writeSRT(chunks: chunks, to: URL(fileURLWithPath: srtPath))
+    }
+
+    static func parseArguments<S: Sequence>(_ arguments: S) -> [String: String] where S.Element == String {
+        var parsed: [String: String] = [:]
+        var iterator = arguments.makeIterator()
+        while let argument = iterator.next() {
+            guard argument.hasPrefix("--") else {
+                continue
+            }
+            let key = String(argument.dropFirst(2))
+            parsed[key] = iterator.next()
+        }
+        return parsed
+    }
+
+    static func transcribe(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
+        guard let recognizer = SFSpeechRecognizer(locale: locale), recognizer.isAvailable else {
+            throw ToolError.recognizerUnavailable(locale.identifier)
+        }
+
+        let authorizationStatus = await withCheckedContinuation { continuation in
+            SFSpeechRecognizer.requestAuthorization { status in
+                continuation.resume(returning: status)
+            }
+        }
+        guard authorizationStatus == .authorized else {
+            throw ToolError.authorizationDenied(String(describing: authorizationStatus))
+        }
+
+        return try await transcribeInChunks(audioURL: audioURL, recognizer: recognizer)
+    }
+
+    static func transcribeInChunks(audioURL: URL, recognizer: SFSpeechRecognizer) async throws -> [TranscriptChunk] {
+        let audioFile = try AVAudioFile(forReading: audioURL)
+        let format = audioFile.processingFormat
+        let sampleRate = format.sampleRate
+        let chunkDuration = 55.0
+        let chunkFrames = AVAudioFramePosition(chunkDuration * sampleRate)
+        var chunks: [TranscriptChunk] = []
+        var startFrame: AVAudioFramePosition = 0
+
+        while startFrame < audioFile.length {
+            let framesRemaining = audioFile.length - startFrame
+            let framesToRead = min(chunkFrames, framesRemaining)
+            guard let buffer = AVAudioPCMBuffer(
+                pcmFormat: format,
+                frameCapacity: AVAudioFrameCount(framesToRead)
+            ) else {
+                throw ToolError.recognitionFailed("Could not allocate audio buffer.")
+            }
+
+            audioFile.framePosition = startFrame
+            try audioFile.read(into: buffer, frameCount: AVAudioFrameCount(framesToRead))
+
+            let chunkURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("apple_dictation_\(UUID().uuidString).wav")
+            let chunkFile = try AVAudioFile(forWriting: chunkURL, settings: audioFile.fileFormat.settings)
+            try chunkFile.write(from: buffer)
+
+            do {
+                let result = try await recognizeAudio(url: chunkURL, recognizer: recognizer)
+                let offset = Double(startFrame) / sampleRate
+                chunks.append(contentsOf: groupSegments(result.bestTranscription.segments, offset: offset))
+                try? FileManager.default.removeItem(at: chunkURL)
+            } catch ToolError.recognitionFailed(let message) where isNoSpeechError(message) {
+                try? FileManager.default.removeItem(at: chunkURL)
+            } catch {
+                try? FileManager.default.removeItem(at: chunkURL)
+                throw error
+            }
+
+            startFrame += framesToRead
+        }
+
+        return chunks
+    }
+
+    static func recognizeAudio(url: URL, recognizer: SFSpeechRecognizer) async throws -> SFSpeechRecognitionResult {
+        try await withCheckedThrowingContinuation { continuation in
+            let request = SFSpeechURLRecognitionRequest(url: url)
+            request.shouldReportPartialResults = false
+            if #available(macOS 10.15, *) {
+                request.requiresOnDeviceRecognition = false
+            }
+
+            var didResume = false
+            _ = recognizer.recognitionTask(with: request) { result, error in
+                if let error {
+                    if !didResume {
+                        didResume = true
+                        continuation.resume(throwing: ToolError.recognitionFailed(error.localizedDescription))
+                    }
+                    return
+                }
+
+                guard let result, result.isFinal else {
+                    return
+                }
+                if !didResume {
+                    didResume = true
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+    }
+
+    static func isNoSpeechError(_ message: String) -> Bool {
+        message.localizedCaseInsensitiveContains("no speech detected")
+    }
+
+    static func groupSegments(_ segments: [SFTranscriptionSegment], offset: Double = 0.0) -> [TranscriptChunk] {
+        let maxDuration = 5.0
+        let maxCharacters = 84
+        let maxGap = 0.9
+        var chunks: [TranscriptChunk] = []
+        var words: [String] = []
+        var chunkStart = 0.0
+        var chunkEnd = 0.0
+
+        func flush() {
+            let text = words.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty else {
+                return
+            }
+            chunks.append(
+                TranscriptChunk(
+                    timestamp: [roundToMillis(chunkStart), roundToMillis(max(chunkStart, chunkEnd))],
+                    text: text
+                )
+            )
+            words.removeAll()
+        }
+
+        for segment in segments {
+            let word = segment.substring.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !word.isEmpty else {
+                continue
+            }
+
+            let start = offset + segment.timestamp
+            let end = start + segment.duration
+            if words.isEmpty {
+                chunkStart = start
+                chunkEnd = end
+                words.append(word)
+                continue
+            }
+
+            let candidateLength = words.joined(separator: " ").count + 1 + word.count
+            let gap = start - chunkEnd
+            if gap > maxGap || end - chunkStart > maxDuration || candidateLength > maxCharacters {
+                flush()
+                chunkStart = start
+                chunkEnd = end
+                words.append(word)
+                continue
+            }
+
+            words.append(word)
+            chunkEnd = end
+
+            if word.hasSuffix(".") || word.hasSuffix("?") || word.hasSuffix("!") {
+                flush()
+            }
+        }
+
+        flush()
+        return chunks
+    }
+
+    static func mergeAdjacentDuplicates(_ chunks: [TranscriptChunk]) -> [TranscriptChunk] {
+        var merged: [TranscriptChunk] = []
+        for chunk in chunks {
+            if merged.last?.text == chunk.text {
+                continue
+            }
+            merged.append(chunk)
+        }
+        return merged
+    }
+
+    static func writeSRT(chunks: [TranscriptChunk], to url: URL) throws {
+        var output = ""
+        for (index, chunk) in chunks.enumerated() {
+            let start = chunk.timestamp.first ?? 0.0
+            let end = chunk.timestamp.dropFirst().first ?? start
+            output += "\(index + 1)\n"
+            output += "\(formatTimestamp(start)) --> \(formatTimestamp(end))\n"
+            output += "\(chunk.text)\n\n"
+        }
+        try output.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    static func roundToMillis(_ value: Double) -> Double {
+        (value * 1000.0).rounded() / 1000.0
+    }
+
+    static func formatTimestamp(_ seconds: Double) -> String {
+        let safeSeconds = max(0.0, seconds)
+        let millisecondsTotal = Int((safeSeconds * 1000.0).rounded())
+        let hours = millisecondsTotal / 3_600_000
+        let minutes = (millisecondsTotal % 3_600_000) / 60_000
+        let secs = (millisecondsTotal % 60_000) / 1000
+        let millis = millisecondsTotal % 1000
+        return String(format: "%02d:%02d:%02d,%03d", hours, minutes, secs, millis)
+    }
+}
