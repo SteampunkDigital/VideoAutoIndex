@@ -1,7 +1,6 @@
 """Backward-compatible default transcriber import.
 
-The default pipeline still uses the Whisper implementation. Import the Canary
-Qwen CoreML transcriber explicitly from src.transcriber_canary_qwen_coreml.
+The default pipeline uses the Whisper implementation.
 """
 
 from .transcriber_whisper import Transcriber

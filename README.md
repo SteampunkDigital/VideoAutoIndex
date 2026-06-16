@@ -50,39 +50,57 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
    This will automatically install all dependencies, including insanely-fast-whisper.
 
-3. Set up your Anthropic API key:
+3. Create a `.env` file for API-backed modes:
    ```bash
-   export ANTHROPIC_API_KEY='your-api-key'
+   cp .env.example .env
    ```
+
+   Add the keys for the hosted model providers you plan to use:
+   ```bash
+   ANTHROPIC_API_KEY=your-anthropic-api-key
+   OPENAI_API_KEY=your-openai-api-key
+   ```
+
+   You only need the key for the mode you run:
+   - `--anthropic` requires `ANTHROPIC_API_KEY`
+   - `--openai` requires `OPENAI_API_KEY`
+   - `--apple` does not require any API keys
+
+   Shell environment variables take precedence over values in `.env`.
 
 ## Usage
 
 Process a video file:
 ```bash
-python -m src.main [video path] [--output-dir output] [--device-id DEVICE]
+python -m src.main [video path] (--apple | --openai | --anthropic) [--output-dir output]
 ```
 
-Device options:
-- Default: Automatically uses MPS on Apple Silicon, CPU/CUDA on other systems
-- `--device-id 0`: Force CPU/CUDA device
-- `--device-id mps`: Force MPS device on Apple Silicon
+Running modes:
+- `--apple`: Uses Apple `DictationTranscriber` for transcription and `tools/apple_foundation_key_moments.swift` for key moments. No API keys are needed.
+- `--openai`: Uses Whisper for transcription and OpenAI for key moments analysis. Requires `OPENAI_API_KEY`.
+- `--anthropic`: Uses Whisper for transcription and Claude for key moments analysis. Requires `ANTHROPIC_API_KEY`.
+
+Whisper device defaults:
+- Darwin/macOS: `mps`
+- Windows/Linux: `0` for CPU/CUDA
+- Use `--device-id DEVICE` to override the Whisper device for `--openai` or `--anthropic`.
 
 For example:
 ```bash
-# Use default device (auto-detected)
-python -m src.main /path/to/video.mp4 --output-dir output
+# Local Apple models; no API keys required
+python -m src.main /path/to/video.mp4 --apple --output-dir output
 
-# Force CPU/CUDA device
-python -m src.main /path/to/video.mp4 --output-dir output --device-id 0
+# Whisper transcription plus OpenAI analysis
+python -m src.main /path/to/video.mp4 --openai --output-dir output
 
-# Force MPS device on Apple Silicon
-python -m src.main /path/to/video.mp4 --output-dir output --device-id mps
+# Whisper transcription plus Claude analysis
+python -m src.main /path/to/video.mp4 --anthropic --output-dir output
 ```
 
 This will:
 1. Extract audio from the video
-2. Transcribe the audio using insanely-fast-whisper
-3. Analyze the meeting content for topics and key moments
+2. Transcribe the audio using the selected mode
+3. Analyze the meeting content for topics and key moments using the selected mode
 4. Generate an HTML summary page
 
 The output directory will contain:
@@ -120,8 +138,9 @@ The analysis JSON follows this structure:
 
 The project is organized into modular components:
 - `video_processor.py`: Handles video/audio operations
-- `transcriber.py`: Speech-to-text conversion using insanely-fast-whisper
-- `key_moments.py`: AI content analysis
+- `transcriber.py`: Speech-to-text conversion using insanely-fast-whisper for hosted model modes
+- `transcriber_apple_dictation.py`: Apple DictationTranscriber wrapper for `--apple`
+- `key_moments.py`: AI content analysis using Anthropic, OpenAI, or Apple Foundation Models
 - `web_generator.py`: HTML summary generation
 - `main.py`: Pipeline orchestration
 

@@ -18,15 +18,15 @@ class Transcriber:
         Args:
             audio_path: Path to the audio file
             model_name: Name of the Whisper model to use
-            device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon, defaults to "0")
+            device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Darwin)
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
         self.audio_path = audio_path
         self.model_name = model_name
-        # Default to "mps" on macOS/Apple Silicon, "0" otherwise
+        # Default to "mps" on Darwin, "0" otherwise.
         self.device_id = device_id or (
-            "mps" if platform.system() == "Darwin" and platform.machine() == "arm64" else "0"
+            "mps" if platform.system() == "Darwin" else "0"
         )
 
     def _format_timestamp(self, seconds: float) -> str:

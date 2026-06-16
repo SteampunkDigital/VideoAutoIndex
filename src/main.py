@@ -5,10 +5,36 @@ import sys
 import json
 import argparse
 import subprocess
+import platform
 from pathlib import Path
 from .video_processor import VideoProcessor
 from .key_moments import KeyMomentsExtractor
 from .web_generator import WebGenerator
+
+WHISPER_DEVICE_BY_PLATFORM = {
+    "Darwin": "mps",
+}
+
+def load_env_file(env_path: str = ".env"):
+    """Load simple KEY=value entries from a .env file without overriding the shell."""
+    path = Path(env_path)
+    if not path.exists():
+        return
+
+    with path.open() as env_file:
+        for line in env_file:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+def default_whisper_device_id():
+    """Return the default insanely-fast-whisper device for this platform."""
+    return WHISPER_DEVICE_BY_PLATFORM.get(platform.system(), "0")
 
 def check_ffmpeg():
     """Check if ffmpeg is installed and accessible."""
@@ -74,31 +100,37 @@ def create_transcriber(audio_path: str, transcriber_name: str = "whisper", devic
     if transcriber_name == "whisper":
         from .transcriber import Transcriber
 
-        return Transcriber(audio_path, device_id=device_id)
-    if transcriber_name == "qwen":
-        from .transcriber_canary_qwen_coreml import CanaryQwenCoreMLTranscriber
-
-        return CanaryQwenCoreMLTranscriber(audio_path)
+        return Transcriber(audio_path, device_id=device_id or default_whisper_device_id())
     if transcriber_name == "dictation":
         from .transcriber_apple_dictation import AppleDictationTranscriber
 
         return AppleDictationTranscriber(audio_path)
-    raise ValueError("transcriber_name must be 'whisper', 'qwen', or 'dictation'")
+    raise ValueError("transcriber_name must be 'whisper' or 'dictation'")
+
+def transcriber_for_provider(api_provider: str):
+    """Map the selected running mode to its transcription backend."""
+    if api_provider == "apple":
+        return "dictation"
+    if api_provider in ("openai", "anthropic"):
+        return "whisper"
+    raise ValueError("api_provider must be 'anthropic', 'openai', or 'apple'")
 
 def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None,
-                 api_provider: str = None, api_key: str = None, transcriber_name: str = "whisper"):
+                 api_provider: str = None, api_key: str = None):
     """
     Main processing pipeline for video indexing.
     
     Args:
         video_path: Path to the input video file
         output_dir: Directory to store intermediate files
-        device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)
+        device_id: Device ID for Whisper inference ("0" for CPU/CUDA, "mps" for Darwin)
         skip_to: Stage to skip to ('transcribe', 'analyze', or 'generate')
-        transcriber_name: Audio transcriber to use ('whisper', 'qwen', or 'dictation')
+        api_provider: Running mode. Apple uses Apple Dictation; OpenAI/Anthropic use Whisper.
     """
     os.makedirs(output_dir, exist_ok=True)
     print("\nProcessing video...")
+    api_provider = api_provider or "anthropic"
+    transcriber_name = transcriber_for_provider(api_provider)
     
     audio_path = os.path.join(output_dir, f"{Path(video_path).stem}_audio.wav")
     transcript_path = os.path.join(output_dir, "audio_transcript.json")
@@ -177,10 +209,8 @@ def main():
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
-    parser.add_argument("--device-id", help='Device ID for inference ("0" for CPU/CUDA, "mps" for Apple Silicon)')
-    parser.add_argument("--transcriber", choices=["whisper", "qwen", "dictation"], default="whisper",
-                       help="Audio transcriber backend to use (default: whisper)")
-    parser.add_argument("--skip", choices=['transcribe', 'analyze', 'generate'], 
+    parser.add_argument("--device-id", help='Override Whisper device ID ("mps" on Darwin by default, "0" on Windows/Linux)')
+    parser.add_argument("--skipto", choices=['transcribe', 'analyze', 'generate'], dest="skip_to",
                        help="Skip to a specific stage (transcribe, analyze, or generate)")
     
     # API provider selection - mutually exclusive
@@ -193,6 +223,7 @@ def main():
                           help="Use Apple Foundation Models on this Mac (no API key required)")
     
     args = parser.parse_args()
+    load_env_file()
     
     # Check basic dependencies first
     if not all([check_ffmpeg(), check_python_dependencies()]):
@@ -203,8 +234,8 @@ def main():
     if not api_provider:
         sys.exit(1)
     
-    process_video(args.video_path, args.output_dir, args.device_id, args.skip,
-                 api_provider, api_key, args.transcriber)
+    process_video(args.video_path, args.output_dir, args.device_id, args.skip_to,
+                 api_provider, api_key)
 
 if __name__ == "__main__":
     main()

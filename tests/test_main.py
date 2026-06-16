@@ -3,7 +3,17 @@ import os
 import json
 import subprocess
 from pathlib import Path
-from src.main import process_video, check_ffmpeg, check_python_dependencies, check_api_key, create_transcriber, get_api_config
+from src.main import (
+    process_video,
+    check_ffmpeg,
+    check_python_dependencies,
+    check_api_key,
+    create_transcriber,
+    get_api_config,
+    transcriber_for_provider,
+    default_whisper_device_id,
+    load_env_file,
+)
 
 @pytest.fixture
 def test_data_dir():
@@ -84,12 +94,6 @@ def test_create_transcriber_defaults_to_whisper(dummy_wav):
 
     assert transcriber.__class__.__name__ == "Transcriber"
 
-def test_create_transcriber_qwen(dummy_wav):
-    """Test qwen transcriber selection uses Canary-Qwen CoreML class."""
-    transcriber = create_transcriber(dummy_wav, "qwen")
-
-    assert transcriber.__class__.__name__ == "CanaryQwenCoreMLTranscriber"
-
 def test_create_transcriber_dictation(dummy_wav):
     """Test dictation transcriber selection uses Apple Speech wrapper."""
     transcriber = create_transcriber(dummy_wav, "dictation")
@@ -100,6 +104,35 @@ def test_create_transcriber_invalid_name(dummy_wav):
     """Test invalid transcriber selection fails clearly."""
     with pytest.raises(ValueError, match="transcriber_name"):
         create_transcriber(dummy_wav, "invalid")
+
+def test_transcriber_for_provider_consolidates_modes():
+    """Test each running mode maps to its fixed transcription backend."""
+    assert transcriber_for_provider("apple") == "dictation"
+    assert transcriber_for_provider("openai") == "whisper"
+    assert transcriber_for_provider("anthropic") == "whisper"
+
+def test_default_whisper_device_id(monkeypatch):
+    """Test Whisper uses MPS on Darwin and 0 elsewhere."""
+    monkeypatch.setattr("src.main.platform.system", lambda: "Darwin")
+    assert default_whisper_device_id() == "mps"
+
+    monkeypatch.setattr("src.main.platform.system", lambda: "Linux")
+    assert default_whisper_device_id() == "0"
+
+def test_load_env_file_does_not_override_shell_env(tmp_path, monkeypatch):
+    """Test .env loading fills missing keys while preserving existing env values."""
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "ANTHROPIC_API_KEY=from-file\nOPENAI_API_KEY='from-file-openai'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "from-shell")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    load_env_file(env_file)
+
+    assert os.environ["ANTHROPIC_API_KEY"] == "from-shell"
+    assert os.environ["OPENAI_API_KEY"] == "from-file-openai"
 
 @pytest.mark.xfail(reason="Anthropic API mocking needs to be fixed")
 @pytest.mark.integration
@@ -112,7 +145,7 @@ def test_full_pipeline(sample_video, temp_dir, monkeypatch, test_data_dir):
         return original_init(self, audio_path, model_name)
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
-    process_video(sample_video, temp_dir)
+    process_video(sample_video, temp_dir, api_provider="anthropic", api_key="test-key")
     
     # Check that all expected output files were created with correct names
     expected_files = [
@@ -166,7 +199,7 @@ def test_pipeline_creates_output_dir(sample_video, temp_dir, monkeypatch):
     monkeypatch.setattr(Transcriber, "__init__", mock_init)
     
     output_dir = os.path.join(temp_dir, "nested", "output")
-    process_video(sample_video, output_dir)
+    process_video(sample_video, output_dir, api_provider="anthropic", api_key="test-key")
     assert os.path.exists(output_dir)
 
 @pytest.mark.integration
