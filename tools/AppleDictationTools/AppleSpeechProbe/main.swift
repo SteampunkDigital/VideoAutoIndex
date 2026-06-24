@@ -12,10 +12,7 @@ struct AppleSpeechProbe {
             print("SFSpeechRecognizer(en-US).isAvailable=\(SFSpeechRecognizer(locale: locale)?.isAvailable.description ?? "nil")")
             print("SpeechTranscriber.supportedLocales=\((await SpeechTranscriber.supportedLocales).map(\.identifier).sorted())")
             print("SpeechTranscriber.installedLocales=\((await SpeechTranscriber.installedLocales).map(\.identifier).sorted())")
-            print("DictationTranscriber.supportedLocales=\((await DictationTranscriber.supportedLocales).map(\.identifier).sorted())")
-            print("DictationTranscriber.installedLocales=\((await DictationTranscriber.installedLocales).map(\.identifier).sorted())")
             print("SpeechTranscriber.supportedLocale=\(String(describing: await SpeechTranscriber.supportedLocale(equivalentTo: locale)))")
-            print("DictationTranscriber.supportedLocale=\(String(describing: await DictationTranscriber.supportedLocale(equivalentTo: locale)))")
 
             await probe("speech.transcription") {
                 SpeechTranscriber(locale: locale, preset: .transcription)
@@ -25,15 +22,6 @@ struct AppleSpeechProbe {
             }
             await probe("speech.timeIndexedProgressiveTranscription") {
                 SpeechTranscriber(locale: locale, preset: .timeIndexedProgressiveTranscription)
-            }
-            await probe("dictation.shortDictation") {
-                DictationTranscriber(locale: locale, preset: .shortDictation)
-            }
-            await probe("dictation.longDictation") {
-                DictationTranscriber(locale: locale, preset: .longDictation)
-            }
-            await probe("dictation.timeIndexedLongDictation") {
-                DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
             }
         } else {
             print("requires macOS 26.0 or newer")

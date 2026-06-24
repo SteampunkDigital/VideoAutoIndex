@@ -12,38 +12,34 @@ MACOS_SDK_ROOTS = [
 ]
 
 
-class AppleDictationTranscriber:
+class AppleSpeechTranscriber:
     def __init__(
         self,
         audio_path: str,
         locale: str = "en-US",
         compare_locale: str | None = None,
-        engine: str = "speech-progressive",
     ):
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        if engine not in {"dictation", "speech-progressive"}:
-            raise ValueError("engine must be 'dictation' or 'speech-progressive'")
         self.audio_path = audio_path
         self.locale = locale
         self.compare_locale = compare_locale
-        self.engine = engine
         self.project_root = Path(__file__).resolve().parents[1]
         self.source_path = (
             self.project_root
             / "tools"
             / "AppleDictationTools"
-            / "AppleDictationTranscriber"
+            / "AppleSpeechTranscriber"
             / "main.swift"
         )
         self.info_plist_path = (
             self.project_root
             / "tools"
             / "AppleDictationTools"
-            / "AppleDictationTranscriber"
+            / "AppleSpeechTranscriber"
             / "Info.plist"
         )
-        self.binary_path = self.project_root / ".build" / "apple_dictation_transcriber"
+        self.binary_path = self.project_root / ".build" / "apple_speech_transcriber"
 
     def transcribe(self, transcript_path: str, subtitle_path: str):
         self._ensure_binary()
@@ -60,8 +56,6 @@ class AppleDictationTranscriber:
             subtitle_path,
             "--locale",
             self.locale,
-            "--engine",
-            self.engine,
         ]
         if self.compare_locale:
             command.extend(["--compare-locale", self.compare_locale])
@@ -78,7 +72,7 @@ class AppleDictationTranscriber:
                 for part in (error.stdout, error.stderr)
                 if part and part.strip()
             )
-            message = f"Apple DictationTranscriber failed with exit code {error.returncode}."
+            message = f"Apple SpeechTranscriber failed with exit code {error.returncode}."
             if details:
                 message = f"{message}\n{details}"
             raise RuntimeError(message) from error
@@ -134,7 +128,7 @@ class AppleDictationTranscriber:
             return str(candidate), version
 
         raise RuntimeError(
-            "Apple DictationTranscriber requires the macOS 26 SDK or newer. "
+            "Apple SpeechTranscriber requires the macOS 26 SDK or newer. "
             "Install Xcode/CommandLineTools with MacOSX26.x.sdk or newer."
         )
 

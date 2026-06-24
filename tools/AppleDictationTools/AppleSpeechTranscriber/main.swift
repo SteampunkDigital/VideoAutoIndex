@@ -24,7 +24,6 @@ struct TextSpan {
 
 enum ToolError: Error, CustomStringConvertible {
     case missingArgument(String)
-    case invalidArgument(String)
     case unsupportedRuntime
     case invalidAudioPath(String)
 
@@ -32,10 +31,8 @@ enum ToolError: Error, CustomStringConvertible {
         switch self {
         case .missingArgument(let message):
             return message
-        case .invalidArgument(let message):
-            return message
         case .unsupportedRuntime:
-            return "Apple DictationTranscriber requires macOS 26.0 or newer."
+            return "Apple SpeechTranscriber requires macOS 26.0 or newer."
         case .invalidAudioPath(let path):
             return "Audio file not found: \(path)"
         }
@@ -44,16 +41,11 @@ enum ToolError: Error, CustomStringConvertible {
 
 func debugLog(_ message: String) {
     let timestamp = ISO8601DateFormatter().string(from: Date())
-    fputs("[apple-dictation \(timestamp)] \(message)\n", stderr)
-}
-
-enum TranscriptionEngine: String {
-    case dictation
-    case speechProgressive = "speech-progressive"
+    fputs("[apple-speech \(timestamp)] \(message)\n", stderr)
 }
 
 @main
-struct AppleDictationTranscriberTool {
+struct AppleSpeechTranscriberTool {
     static func main() async {
         do {
             try await run()
@@ -76,31 +68,25 @@ struct AppleDictationTranscriberTool {
         }
         let localeIdentifier = args["locale"] ?? "en-US"
         let comparisonLocaleIdentifier = args["compare-locale"]
-        let engineName = args["engine"] ?? TranscriptionEngine.speechProgressive.rawValue
-        guard let engine = TranscriptionEngine(rawValue: engineName) else {
-            throw ToolError.invalidArgument("Invalid --engine value: \(engineName). Use dictation or speech-progressive.")
-        }
 
         guard FileManager.default.fileExists(atPath: audioPath) else {
             throw ToolError.invalidAudioPath(audioPath)
         }
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: audioPath)[.size] as? NSNumber)?.int64Value
-        debugLog("audio=\(audioPath) bytes=\(fileSize.map(String.init) ?? "unknown") locale=\(localeIdentifier) compareLocale=\(comparisonLocaleIdentifier ?? "none") engine=\(engine.rawValue)")
+        debugLog("audio=\(audioPath) bytes=\(fileSize.map(String.init) ?? "unknown") locale=\(localeIdentifier) compareLocale=\(comparisonLocaleIdentifier ?? "none")")
         debugLog("outputs transcript=\(transcriptPath) srt=\(srtPath)")
 
         if #available(macOS 26.0, *) {
             let primaryChunks = try await transcribe(
                 audioURL: URL(fileURLWithPath: audioPath),
-                locale: Locale(identifier: localeIdentifier),
-                engine: engine
+                locale: Locale(identifier: localeIdentifier)
             )
             let chunks: [TranscriptChunk]
             if let comparisonLocaleIdentifier,
                comparisonLocaleIdentifier != localeIdentifier {
                 let comparisonChunks = try await transcribe(
                     audioURL: URL(fileURLWithPath: audioPath),
-                    locale: Locale(identifier: comparisonLocaleIdentifier),
-                    engine: engine
+                    locale: Locale(identifier: comparisonLocaleIdentifier)
                 )
                 chunks = selectBestTimeline(primaryChunks + comparisonChunks)
                 debugLog(
@@ -149,94 +135,7 @@ struct AppleDictationTranscriberTool {
     }
 
     @available(macOS 26.0, *)
-    static func transcribe(audioURL: URL, locale: Locale, engine: TranscriptionEngine) async throws -> [TranscriptChunk] {
-        switch engine {
-        case .dictation:
-            return try await transcribeWithDictation(audioURL: audioURL, locale: locale)
-        case .speechProgressive:
-            return try await transcribeWithSpeechProgressive(audioURL: audioURL, locale: locale)
-        }
-    }
-
-    @available(macOS 26.0, *)
-    static func transcribeWithDictation(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
-        debugLog("creating DictationTranscriber locale=\(locale.identifier) preset=timeIndexedLongDictation")
-        let supportedEquivalent = await DictationTranscriber.supportedLocale(equivalentTo: locale)
-        debugLog("DictationTranscriber.supportedLocale=\(String(describing: supportedEquivalent))")
-        let installedLocales = await DictationTranscriber.installedLocales
-        debugLog("DictationTranscriber.installedLocales=\(installedLocales.map(\.identifier).sorted())")
-
-        let effectiveLocale = supportedEquivalent ?? locale
-        debugLog("effective locale=\(effectiveLocale.identifier)")
-        let transcriber = DictationTranscriber(
-            locale: effectiveLocale,
-            contentHints: [.farField],
-            transcriptionOptions: [.punctuation],
-            reportingOptions: [],
-            attributeOptions: [.audioTimeRange, .transcriptionConfidence]
-        )
-        let modules: [any SpeechModule] = [transcriber]
-
-        let status = await AssetInventory.status(forModules: modules)
-        debugLog("AssetInventory.status=\(status)")
-        if status != .installed {
-            if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
-                debugLog("downloading/installing speech assets")
-                try await request.downloadAndInstall()
-                debugLog("asset installation completed")
-            } else {
-                debugLog("asset installation request unavailable")
-            }
-        }
-
-        debugLog("opening audio file")
-        let audioFile = try AVAudioFile(forReading: audioURL)
-        debugLog(
-            "audio format sampleRate=\(audioFile.processingFormat.sampleRate) channels=\(audioFile.processingFormat.channelCount) frames=\(audioFile.length)"
-        )
-        let analyzer = SpeechAnalyzer(modules: modules)
-
-        var resultTaskChunks: [TranscriptChunk] = []
-        let resultTask = Task {
-            var chunks: [TranscriptChunk] = []
-            var rawResultCount = 0
-            for try await result in transcriber.results {
-                let attributedText = result.text
-                let text = String(attributedText.characters)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !text.isEmpty else {
-                    continue
-                }
-
-                let start = max(0.0, CMTimeGetSeconds(result.range.start))
-                let duration = max(0.0, CMTimeGetSeconds(result.range.duration))
-                let end = max(start, start + duration)
-                let splitChunks = splitResultText(
-                    text,
-                    start: start,
-                    end: end,
-                    confidence: averageConfidence(attributedText),
-                    locale: effectiveLocale.identifier
-                )
-                debugLog(
-                    "result chunk start=\(roundToMillis(start)) end=\(roundToMillis(end)) chars=\(text.count) split=\(splitChunks.count)"
-                )
-                chunks.append(contentsOf: splitChunks)
-                rawResultCount += 1
-            }
-            debugLog("result stream finished raw=\(rawResultCount) chunks=\(chunks.count)")
-            return chunks
-        }
-
-        try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
-        resultTaskChunks = try await resultTask.value
-        let merged = mergeAdjacentDuplicates(resultTaskChunks)
-        debugLog("merged adjacent duplicates input=\(resultTaskChunks.count) output=\(merged.count)")
-        return merged
-    }
-
-    @available(macOS 26.0, *)
-    static func transcribeWithSpeechProgressive(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
+    static func transcribe(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
         debugLog("creating SpeechTranscriber locale=\(locale.identifier) preset=timeIndexedProgressiveTranscription")
         let supportedEquivalent = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
         debugLog("SpeechTranscriber.supportedLocale=\(String(describing: supportedEquivalent))")

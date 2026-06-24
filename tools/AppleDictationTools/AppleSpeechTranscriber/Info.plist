@@ -4,10 +4,10 @@
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>local.video-auto-index.apple-dictation-transcriber</string>
+  <string>local.video-auto-index.apple-speech-transcriber</string>
   <key>CFBundleName</key>
-  <string>Apple Dictation Transcriber</string>
+  <string>Apple Speech Transcriber</string>
   <key>NSSpeechRecognitionUsageDescription</key>
-  <string>VideoAutoIndex uses Apple Dictation to transcribe audio from videos.</string>
+  <string>VideoAutoIndex uses Apple Speech to transcribe audio from videos.</string>
 </dict>
 </plist>

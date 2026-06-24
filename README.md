@@ -83,15 +83,14 @@ python -m src.main [video path] (--apple | --openai | --anthropic) [--output-dir
 ```
 
 Running modes:
-- `--apple`: Uses Apple `DictationTranscriber` for transcription and `tools/AppleDictationTools` for local key moments. No API keys are needed.
+- `--apple`: Uses Apple `SpeechTranscriber` for transcription and `tools/AppleDictationTools` for local key moments. No API keys are needed.
 - `--openai`: Uses Whisper for transcription and OpenAI for key moments analysis. Requires `OPENAI_API_KEY`.
 - `--anthropic`: Uses Whisper for transcription and Claude for key moments analysis. Requires `ANTHROPIC_API_KEY`.
 
 Transcription language:
 - `--transcription-language en`: English transcription. This is the default.
 - `--transcription-language ja`: Japanese transcription.
-- `--compare-transcription-language en|ja`: Apple-only second pass. Runs the Apple speech engine twice and selects a non-overlapping transcript timeline using confidence and simple text-quality scoring.
-- `--apple-transcription-engine speech-progressive|dictation`: Apple-only engine selector. `speech-progressive` is the default; `dictation` remains available for debugging.
+- In Apple Japanese mode, the tool automatically runs a second English `SpeechTranscriber` pass and selects a non-overlapping transcript timeline using confidence and simple text-quality scoring.
 - Transcripts and subtitles stay in the spoken language. Topic names, key moments, and takeaways in `meeting_analysis.json` are generated in English.
 - Apple transcript JSON chunks include `confidence` and `locale` when the Speech framework returns confidence attributes.
 
@@ -114,11 +113,8 @@ python -m src.main /path/to/video.mp4 --anthropic --output-dir output
 # Japanese native transcription plus English analysis
 python -m src.main /path/to/video.mp4 --apple --transcription-language ja --output-dir output
 
-# Japanese primary pass plus English comparison pass using SpeechTranscriber
-python -m src.main /path/to/video.mp4 --apple --transcription-language ja --compare-transcription-language en --apple-transcription-engine speech-progressive --output-dir output
-
 # Shell wrapper: mode defaults to apple, language defaults to en
-./run.sh /path/to/video.mp4 apple ja en speech-progressive
+./run.sh /path/to/video.mp4 apple ja
 ```
 
 This will:
@@ -163,7 +159,7 @@ The analysis JSON follows this structure:
 The project is organized into modular components:
 - `video_processor.py`: Handles video/audio operations
 - `transcriber.py`: Speech-to-text conversion using insanely-fast-whisper for hosted model modes
-- `transcriber_apple_dictation.py`: Apple DictationTranscriber wrapper for `--apple`
+- `transcriber_apple_speech.py`: Apple SpeechTranscriber wrapper for `--apple`
 - `key_moments.py`: AI content analysis using Anthropic, OpenAI, or Apple Foundation Models
 - `web_generator.py`: HTML summary generation
 - `main.py`: Pipeline orchestration

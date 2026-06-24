@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "000000000000000100000001"
-               BuildableName = "AppleDictationTranscriber"
+               BuildableName = "AppleSpeechTranscriber"
                ReferencedContainer = "container:AppleDictationTools.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -46,7 +46,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000001"
-            BuildableName = "AppleDictationTranscriber"
+            BuildableName = "AppleSpeechTranscriber"
             ReferencedContainer = "container:AppleDictationTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -56,15 +56,11 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "--transcript /Users/otri/Desktop/VideoAutoIndex/output/xcode_dictation_transcript.json"
+            argument = "--transcript /Users/otri/Desktop/VideoAutoIndex/output/xcode_speech_transcript.json"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "--srt /Users/otri/Desktop/VideoAutoIndex/output/xcode_dictation_subtitles.srt"
-            isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "--engine speech-progressive"
+            argument = "--srt /Users/otri/Desktop/VideoAutoIndex/output/xcode_speech_subtitles.srt"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
@@ -88,7 +84,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "000000000000000100000001"
-            BuildableName = "AppleDictationTranscriber"
+            BuildableName = "AppleSpeechTranscriber"
             ReferencedContainer = "container:AppleDictationTools.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

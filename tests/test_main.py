@@ -97,37 +97,37 @@ def test_create_transcriber_defaults_to_whisper(dummy_wav):
     assert transcriber.__class__.__name__ == "Transcriber"
     assert transcriber.language == "en"
 
-def test_create_transcriber_dictation(dummy_wav):
-    """Test dictation transcriber selection uses Apple Speech wrapper."""
-    transcriber = create_transcriber(dummy_wav, "dictation")
+def test_create_transcriber_apple_speech(dummy_wav):
+    """Test Apple transcriber selection uses Apple Speech wrapper."""
+    transcriber = create_transcriber(dummy_wav, "apple_speech")
 
-    assert transcriber.__class__.__name__ == "AppleDictationTranscriber"
+    assert transcriber.__class__.__name__ == "AppleSpeechTranscriber"
     assert transcriber.locale == "en-US"
     assert transcriber.compare_locale is None
-    assert transcriber.engine == "speech-progressive"
 
 def test_create_transcriber_threads_japanese_language(dummy_wav):
     """Test Japanese transcription maps to each backend's native language value."""
     whisper = create_transcriber(dummy_wav, "whisper", transcription_language="ja")
-    dictation = create_transcriber(dummy_wav, "dictation", transcription_language="ja")
+    apple_speech = create_transcriber(dummy_wav, "apple_speech", transcription_language="ja")
 
     assert whisper.language == "ja"
-    assert dictation.locale == "ja-JP"
+    assert apple_speech.locale == "ja-JP"
 
 
-def test_create_transcriber_threads_apple_compare_language_and_engine(dummy_wav):
-    """Test Apple comparison language and engine are passed to the wrapper."""
-    dictation = create_transcriber(
-        dummy_wav,
-        "dictation",
-        transcription_language="ja",
-        compare_transcription_language="en",
-        apple_transcription_engine="speech-progressive",
-    )
+def test_create_transcriber_adds_apple_english_comparison_for_japanese(dummy_wav):
+    """Test Japanese Apple transcription automatically compares against English."""
+    apple_speech = create_transcriber(dummy_wav, "apple_speech", transcription_language="ja")
 
-    assert dictation.locale == "ja-JP"
-    assert dictation.compare_locale == "en-US"
-    assert dictation.engine == "speech-progressive"
+    assert apple_speech.locale == "ja-JP"
+    assert apple_speech.compare_locale == "en-US"
+
+
+def test_create_transcriber_apple_english_has_no_comparison(dummy_wav):
+    """Test English Apple transcription does not run a comparison pass."""
+    apple_speech = create_transcriber(dummy_wav, "apple_speech", transcription_language="en")
+
+    assert apple_speech.locale == "en-US"
+    assert apple_speech.compare_locale is None
 
 def test_transcription_language_mappings():
     """Test CLI language values map to backend-specific values."""
@@ -143,7 +143,7 @@ def test_create_transcriber_invalid_name(dummy_wav):
 
 def test_transcriber_for_provider_consolidates_modes():
     """Test each running mode maps to its fixed transcription backend."""
-    assert transcriber_for_provider("apple") == "dictation"
+    assert transcriber_for_provider("apple") == "apple_speech"
     assert transcriber_for_provider("openai") == "whisper"
     assert transcriber_for_provider("anthropic") == "whisper"
 
