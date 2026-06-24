@@ -1,6 +1,7 @@
 import pytest
 import os
 import json
+import subprocess
 from src.transcriber_whisper import Transcriber
 
 @pytest.fixture
@@ -31,6 +32,29 @@ def test_transcriber_init(test_audio):
     """Test Transcriber initialization with valid audio file."""
     transcriber = Transcriber(test_audio)
     assert transcriber.audio_path == test_audio
+    assert transcriber.language == "en"
+
+def test_transcribe_passes_configured_language(test_audio, temp_dir, monkeypatch):
+    """Test Whisper command uses the configured native transcription language."""
+    transcript_path = os.path.join(temp_dir, "audio_transcript.json")
+    subtitle_path = os.path.join(temp_dir, "audio_subtitles.srt")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        with open(transcript_path, "w") as f:
+            json.dump({"chunks": [], "speakers": [], "text": ""}, f)
+        return subprocess.CompletedProcess(command, 0, stdout="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    transcriber = Transcriber(test_audio, device_id="mps", language="ja")
+    transcriber.transcribe(transcript_path, subtitle_path)
+
+    assert captured["command"][captured["command"].index("--language") + 1] == "ja"
+    assert captured["command"][captured["command"].index("--task") + 1] == "transcribe"
+    assert captured["kwargs"] == {"check": True, "capture_output": True, "text": True}
 
 def test_transcriber_init_invalid_path():
     """Test Transcriber initialization with non-existent audio file."""

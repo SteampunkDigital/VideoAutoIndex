@@ -1,0 +1,361 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 90;
+	objects = {
+
+/* Begin PBXFileReference section */
+		000000000000000000000121 /* AppleDictationTranscriber */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = AppleDictationTranscriber; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000122 /* AppleSpeechProbe */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = AppleSpeechProbe; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000123 /* AppleFoundationKeyMoments */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = AppleFoundationKeyMoments; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		000000000000000000000011 /* AppleDictationTranscriber */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppleDictationTranscriber;
+			sourceTree = "<group>";
+		};
+		000000000000000000000012 /* AppleSpeechProbe */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppleSpeechProbe;
+			sourceTree = "<group>";
+		};
+		000000000000000000000013 /* AppleFoundationKeyMoments */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AppleFoundationKeyMoments;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000130000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		000000000000000130000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		000000000000000130000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000011 /* AppleDictationTranscriber */,
+				000000000000000000000012 /* AppleSpeechProbe */,
+				000000000000000000000013 /* AppleFoundationKeyMoments */,
+				000000000000000000000020 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000121 /* AppleDictationTranscriber */,
+				000000000000000000000122 /* AppleSpeechProbe */,
+				000000000000000000000123 /* AppleFoundationKeyMoments */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000100000001 /* AppleDictationTranscriber */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000001 /* Build configuration list for PBXNativeTarget "AppleDictationTranscriber" */;
+			buildPhases = (
+				000000000000000120000001 /* Sources */,
+				000000000000000130000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000011 /* AppleDictationTranscriber */,
+			);
+			name = AppleDictationTranscriber;
+			productName = AppleDictationTranscriber;
+			productReference = 000000000000000000000121 /* AppleDictationTranscriber */;
+			productType = "com.apple.product-type.tool";
+		};
+		000000000000000100000002 /* AppleSpeechProbe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000002 /* Build configuration list for PBXNativeTarget "AppleSpeechProbe" */;
+			buildPhases = (
+				000000000000000120000002 /* Sources */,
+				000000000000000130000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000012 /* AppleSpeechProbe */,
+			);
+			name = AppleSpeechProbe;
+			productName = AppleSpeechProbe;
+			productReference = 000000000000000000000122 /* AppleSpeechProbe */;
+			productType = "com.apple.product-type.tool";
+		};
+		000000000000000100000003 /* AppleFoundationKeyMoments */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000003 /* Build configuration list for PBXNativeTarget "AppleFoundationKeyMoments" */;
+			buildPhases = (
+				000000000000000120000003 /* Sources */,
+				000000000000000130000003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				000000000000000000000013 /* AppleFoundationKeyMoments */,
+			);
+			name = AppleFoundationKeyMoments;
+			productName = AppleFoundationKeyMoments;
+			productReference = 000000000000000000000123 /* AppleFoundationKeyMoments */;
+			productType = "com.apple.product-type.tool";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					000000000000000100000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					000000000000000100000002 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					000000000000000100000003 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "AppleDictationTools" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 90;
+			productRefGroup = 000000000000000000000020 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000100000001 /* AppleDictationTranscriber */,
+				000000000000000100000002 /* AppleSpeechProbe */,
+				000000000000000100000003 /* AppleFoundationKeyMoments */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000120000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		000000000000000120000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		000000000000000120000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000011000000 /* Debug configuration for PBXProject "AppleDictationTools" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		000000000000000012000000 /* Release configuration for PBXProject "AppleDictationTools" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		000000000000000111000001 /* Debug configuration for PBXNativeTarget "AppleDictationTranscriber" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				INFOPLIST_FILE = AppleDictationTranscriber/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-dictation-transcriber";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		000000000000000112000001 /* Release configuration for PBXNativeTarget "AppleDictationTranscriber" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				INFOPLIST_FILE = AppleDictationTranscriber/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-dictation-transcriber";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		000000000000000111000002 /* Debug configuration for PBXNativeTarget "AppleSpeechProbe" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-speech-probe";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		000000000000000112000002 /* Release configuration for PBXNativeTarget "AppleSpeechProbe" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-speech-probe";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		000000000000000111000003 /* Debug configuration for PBXNativeTarget "AppleFoundationKeyMoments" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				INFOPLIST_FILE = AppleFoundationKeyMoments/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-foundation-key-moments";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		000000000000000112000003 /* Release configuration for PBXNativeTarget "AppleFoundationKeyMoments" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CREATE_INFOPLIST_SECTION_IN_BINARY = YES;
+				INFOPLIST_FILE = AppleFoundationKeyMoments/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				OTHER_SWIFT_FLAGS = "-parse-as-library";
+				PRODUCT_BUNDLE_IDENTIFIER = "local.video-auto-index.apple-foundation-key-moments";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000010000000 /* Build configuration list for PBXProject "AppleDictationTools" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000011000000 /* Debug configuration for PBXProject "AppleDictationTools" */,
+				000000000000000012000000 /* Release configuration for PBXProject "AppleDictationTools" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000001 /* Build configuration list for PBXNativeTarget "AppleDictationTranscriber" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000001 /* Debug configuration for PBXNativeTarget "AppleDictationTranscriber" */,
+				000000000000000112000001 /* Release configuration for PBXNativeTarget "AppleDictationTranscriber" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000002 /* Build configuration list for PBXNativeTarget "AppleSpeechProbe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000002 /* Debug configuration for PBXNativeTarget "AppleSpeechProbe" */,
+				000000000000000112000002 /* Release configuration for PBXNativeTarget "AppleSpeechProbe" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000003 /* Build configuration list for PBXNativeTarget "AppleFoundationKeyMoments" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000003 /* Debug configuration for PBXNativeTarget "AppleFoundationKeyMoments" */,
+				000000000000000112000003 /* Release configuration for PBXNativeTarget "AppleFoundationKeyMoments" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000000 /* Project object */;
+}

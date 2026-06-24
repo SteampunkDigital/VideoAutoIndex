@@ -1,6 +1,7 @@
 import pytest
 import os
 import json
+from pathlib import Path
 from src.key_moments import DEFAULT_OPENAI_MODEL, KeyMomentsExtractor
 
 @pytest.fixture
@@ -60,11 +61,51 @@ def test_key_moments_apple_init_does_not_require_api_key(sample_srt, monkeypatch
     extractor = KeyMomentsExtractor(sample_srt, api_provider="apple")
 
     assert extractor.api_provider == "apple"
-    assert extractor.source_path.name == "apple_foundation_key_moments.swift"
-    assert extractor.info_plist_path.name == "apple_foundation_key_moments_Info.plist"
+    assert extractor.source_path.name == "main.swift"
+    assert extractor.source_path.parent.name == "AppleFoundationKeyMoments"
+    assert extractor.info_plist_path.name == "Info.plist"
+    assert extractor.info_plist_path.parent.name == "AppleFoundationKeyMoments"
     assert extractor.binary_path.name == "apple_foundation_key_moments"
     assert extractor.anthropic is None
     assert extractor.openai is None
+
+def test_key_moments_sdk_roots_include_xcode_beta():
+    import src.key_moments as key_moments
+
+    assert Path("/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs") in key_moments.MACOS_SDK_ROOTS
+
+def test_key_moments_prompt_translates_output_to_english(sample_srt, mock_anthropic_key, mock_anthropic_response, monkeypatch):
+    """Test cloud analysis prompts translate non-English transcript content into English output."""
+    captured = {}
+
+    class MockAnthropicStream:
+        def __enter__(self):
+            self.text_stream = [mock_anthropic_response]
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    class MockAnthropicMessages:
+        def stream(self, **kwargs):
+            captured.update(kwargs)
+            return MockAnthropicStream()
+
+    class MockAnthropic:
+        def __init__(self, api_key):
+            self.messages = MockAnthropicMessages()
+
+    monkeypatch.setattr("src.key_moments.Anthropic", MockAnthropic)
+
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
+    extractor.extract_key_moments()
+
+    prompt = captured["messages"][0]["content"]
+    assert "Write all JSON" in prompt
+    assert "string values in English" in prompt
+    assert "Translate topic names, key moment descriptions, and takeaways into English" in prompt
+    assert "Do not translate or alter timestamp strings" in prompt
+    assert "Translate non-English transcript content into English" in captured["system"]
 
 def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     """Test timestamp format validation."""
@@ -91,6 +132,30 @@ def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     for timestamp in invalid_timestamps:
         with pytest.raises(ValueError):
             extractor._validate_timestamp_format(timestamp)
+
+
+def test_validate_topics_normalizes_srt_timestamp_ranges(sample_srt, mock_anthropic_key):
+    """Test model-produced SRT ranges are normalized to start timestamps."""
+    extractor = KeyMomentsExtractor(sample_srt, api_provider="anthropic", api_key="test-key")
+    topics = [
+        {
+            "topic": "Hybrid battery condition",
+            "timestamp": "00:00:00,000 --> 00:00:23,460",
+            "key_moments": [
+                {
+                    "description": "The battery status is discussed.",
+                    "timestamp": "00:00:15,540 --> 00:00:16,740",
+                }
+            ],
+            "takeaways": ["Battery state appears acceptable."],
+        }
+    ]
+
+    extractor._validate_topics(topics)
+
+    assert topics[0]["timestamp"] == "00:00:00,000"
+    assert topics[0]["key_moments"][0]["timestamp"] == "00:00:15,540"
+
 
 def test_parse_timestamp(sample_srt, mock_anthropic_key):
     """Test timestamp parsing to seconds."""

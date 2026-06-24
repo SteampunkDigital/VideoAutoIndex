@@ -11,6 +11,7 @@ class Transcriber:
         audio_path: str,
         model_name: str = "openai/whisper-large-v3-turbo",
         device_id: str = None,
+        language: str = "en",
     ):
         """
         Initialize the transcriber.
@@ -19,6 +20,7 @@ class Transcriber:
             audio_path: Path to the audio file
             model_name: Name of the Whisper model to use
             device_id: Device ID for inference ("0" for CPU/CUDA, "mps" for Darwin)
+            language: Native language code to transcribe
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -28,6 +30,7 @@ class Transcriber:
         self.device_id = device_id or (
             "mps" if platform.system() == "Darwin" else "0"
         )
+        self.language = language
 
     def _format_timestamp(self, seconds: float) -> str:
         """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)."""
@@ -77,6 +80,7 @@ class Transcriber:
         print("Using insanely-fast-whisper...")
         print(f"Model: {self.model_name}")
         print(f"Device: {self.device_id}")
+        print(f"Language: {self.language}")
 
         try:
             # Run transcription to get JSON output
@@ -88,7 +92,7 @@ class Transcriber:
                     "--transcript-path",
                     transcript_path,
                     "--language",
-                    "en",
+                    self.language,
                     "--device-id",
                     self.device_id,
                     "--model",

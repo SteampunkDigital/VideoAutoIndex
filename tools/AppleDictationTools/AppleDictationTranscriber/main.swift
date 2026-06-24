@@ -6,6 +6,8 @@ import Speech
 struct TranscriptChunk: Codable {
     let timestamp: [Double]
     let text: String
+    let confidence: Double?
+    let locale: String?
 }
 
 struct Transcript: Codable {
@@ -22,12 +24,15 @@ struct TextSpan {
 
 enum ToolError: Error, CustomStringConvertible {
     case missingArgument(String)
+    case invalidArgument(String)
     case unsupportedRuntime
     case invalidAudioPath(String)
 
     var description: String {
         switch self {
         case .missingArgument(let message):
+            return message
+        case .invalidArgument(let message):
             return message
         case .unsupportedRuntime:
             return "Apple DictationTranscriber requires macOS 26.0 or newer."
@@ -40,6 +45,11 @@ enum ToolError: Error, CustomStringConvertible {
 func debugLog(_ message: String) {
     let timestamp = ISO8601DateFormatter().string(from: Date())
     fputs("[apple-dictation \(timestamp)] \(message)\n", stderr)
+}
+
+enum TranscriptionEngine: String {
+    case dictation
+    case speechProgressive = "speech-progressive"
 }
 
 @main
@@ -55,7 +65,6 @@ struct AppleDictationTranscriberTool {
 
     static func run() async throws {
         let args = parseArguments(CommandLine.arguments.dropFirst())
-        debugLog("started argv=\(CommandLine.arguments.dropFirst().joined(separator: " "))")
         guard let audioPath = args["audio"] else {
             throw ToolError.missingArgument("Missing required argument: --audio")
         }
@@ -66,24 +75,40 @@ struct AppleDictationTranscriberTool {
             throw ToolError.missingArgument("Missing required argument: --srt")
         }
         let localeIdentifier = args["locale"] ?? "en-US"
+        let comparisonLocaleIdentifier = args["compare-locale"]
+        let engineName = args["engine"] ?? TranscriptionEngine.speechProgressive.rawValue
+        guard let engine = TranscriptionEngine(rawValue: engineName) else {
+            throw ToolError.invalidArgument("Invalid --engine value: \(engineName). Use dictation or speech-progressive.")
+        }
 
         guard FileManager.default.fileExists(atPath: audioPath) else {
             throw ToolError.invalidAudioPath(audioPath)
         }
-        if let attrs = try? FileManager.default.attributesOfItem(atPath: audioPath),
-           let size = attrs[.size] as? NSNumber {
-            debugLog("audio path=\(audioPath) bytes=\(size)")
-        } else {
-            debugLog("audio path=\(audioPath) bytes=unknown")
-        }
-        debugLog("outputs transcript=\(transcriptPath) srt=\(srtPath) locale=\(localeIdentifier)")
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: audioPath)[.size] as? NSNumber)?.int64Value
+        debugLog("audio=\(audioPath) bytes=\(fileSize.map(String.init) ?? "unknown") locale=\(localeIdentifier) compareLocale=\(comparisonLocaleIdentifier ?? "none") engine=\(engine.rawValue)")
+        debugLog("outputs transcript=\(transcriptPath) srt=\(srtPath)")
 
         if #available(macOS 26.0, *) {
-            debugLog("runtime macOS 26 API path available")
-            let chunks = try await transcribe(
+            let primaryChunks = try await transcribe(
                 audioURL: URL(fileURLWithPath: audioPath),
-                locale: Locale(identifier: localeIdentifier)
+                locale: Locale(identifier: localeIdentifier),
+                engine: engine
             )
+            let chunks: [TranscriptChunk]
+            if let comparisonLocaleIdentifier,
+               comparisonLocaleIdentifier != localeIdentifier {
+                let comparisonChunks = try await transcribe(
+                    audioURL: URL(fileURLWithPath: audioPath),
+                    locale: Locale(identifier: comparisonLocaleIdentifier),
+                    engine: engine
+                )
+                chunks = selectBestTimeline(primaryChunks + comparisonChunks)
+                debugLog(
+                    "selected comparison timeline primary=\(primaryChunks.count) comparison=\(comparisonChunks.count) output=\(chunks.count)"
+                )
+            } else {
+                chunks = primaryChunks
+            }
             debugLog("transcription returned chunks=\(chunks.count)")
             let transcript = Transcript(
                 speakers: [],
@@ -103,9 +128,8 @@ struct AppleDictationTranscriberTool {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             try encoder.encode(transcript).write(to: URL(fileURLWithPath: transcriptPath))
-            debugLog("wrote transcript json")
             try writeSRT(chunks: chunks, to: URL(fileURLWithPath: srtPath))
-            debugLog("wrote srt")
+            debugLog("wrote outputs")
         } else {
             throw ToolError.unsupportedRuntime
         }
@@ -125,7 +149,17 @@ struct AppleDictationTranscriberTool {
     }
 
     @available(macOS 26.0, *)
-    static func transcribe(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
+    static func transcribe(audioURL: URL, locale: Locale, engine: TranscriptionEngine) async throws -> [TranscriptChunk] {
+        switch engine {
+        case .dictation:
+            return try await transcribeWithDictation(audioURL: audioURL, locale: locale)
+        case .speechProgressive:
+            return try await transcribeWithSpeechProgressive(audioURL: audioURL, locale: locale)
+        }
+    }
+
+    @available(macOS 26.0, *)
+    static func transcribeWithDictation(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
         debugLog("creating DictationTranscriber locale=\(locale.identifier) preset=timeIndexedLongDictation")
         let supportedEquivalent = await DictationTranscriber.supportedLocale(equivalentTo: locale)
         debugLog("DictationTranscriber.supportedLocale=\(String(describing: supportedEquivalent))")
@@ -139,15 +173,13 @@ struct AppleDictationTranscriberTool {
             contentHints: [.farField],
             transcriptionOptions: [.punctuation],
             reportingOptions: [],
-            attributeOptions: [.audioTimeRange]
+            attributeOptions: [.audioTimeRange, .transcriptionConfidence]
         )
         let modules: [any SpeechModule] = [transcriber]
 
-        debugLog("checking AssetInventory status")
         let status = await AssetInventory.status(forModules: modules)
         debugLog("AssetInventory.status=\(status)")
         if status != .installed {
-            debugLog("requesting asset installation")
             if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
                 debugLog("downloading/installing speech assets")
                 try await request.downloadAndInstall()
@@ -162,16 +194,15 @@ struct AppleDictationTranscriberTool {
         debugLog(
             "audio format sampleRate=\(audioFile.processingFormat.sampleRate) channels=\(audioFile.processingFormat.channelCount) frames=\(audioFile.length)"
         )
-        debugLog("constructing SpeechAnalyzer")
         let analyzer = SpeechAnalyzer(modules: modules)
-        debugLog("SpeechAnalyzer constructed")
 
         var resultTaskChunks: [TranscriptChunk] = []
-        debugLog("starting result stream task")
         let resultTask = Task {
             var chunks: [TranscriptChunk] = []
+            var rawResultCount = 0
             for try await result in transcriber.results {
-                let text = String(result.text.characters)
+                let attributedText = result.text
+                let text = String(attributedText.characters)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !text.isEmpty else {
                     continue
@@ -180,26 +211,131 @@ struct AppleDictationTranscriberTool {
                 let start = max(0.0, CMTimeGetSeconds(result.range.start))
                 let duration = max(0.0, CMTimeGetSeconds(result.range.duration))
                 let end = max(start, start + duration)
-                let splitChunks = splitResultText(text, start: start, end: end)
+                let splitChunks = splitResultText(
+                    text,
+                    start: start,
+                    end: end,
+                    confidence: averageConfidence(attributedText),
+                    locale: effectiveLocale.identifier
+                )
                 debugLog(
                     "result chunk start=\(roundToMillis(start)) end=\(roundToMillis(end)) chars=\(text.count) split=\(splitChunks.count)"
                 )
                 chunks.append(contentsOf: splitChunks)
+                rawResultCount += 1
             }
-            debugLog("result stream finished chunks=\(chunks.count)")
+            debugLog("result stream finished raw=\(rawResultCount) chunks=\(chunks.count)")
             return chunks
         }
 
-        debugLog("starting analyzer")
         try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
-        debugLog("analyzer completed; awaiting result task")
         resultTaskChunks = try await resultTask.value
         let merged = mergeAdjacentDuplicates(resultTaskChunks)
         debugLog("merged adjacent duplicates input=\(resultTaskChunks.count) output=\(merged.count)")
         return merged
     }
 
-    static func splitResultText(_ text: String, start: Double, end: Double) -> [TranscriptChunk] {
+    @available(macOS 26.0, *)
+    static func transcribeWithSpeechProgressive(audioURL: URL, locale: Locale) async throws -> [TranscriptChunk] {
+        debugLog("creating SpeechTranscriber locale=\(locale.identifier) preset=timeIndexedProgressiveTranscription")
+        let supportedEquivalent = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
+        debugLog("SpeechTranscriber.supportedLocale=\(String(describing: supportedEquivalent))")
+        let installedLocales = await SpeechTranscriber.installedLocales
+        debugLog("SpeechTranscriber.installedLocales=\(installedLocales.map(\.identifier).sorted())")
+
+        let effectiveLocale = supportedEquivalent ?? locale
+        debugLog("effective locale=\(effectiveLocale.identifier)")
+        let transcriber = SpeechTranscriber(
+            locale: effectiveLocale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: [.audioTimeRange, .transcriptionConfidence]
+        )
+        let modules: [any SpeechModule] = [transcriber]
+
+        let status = await AssetInventory.status(forModules: modules)
+        debugLog("AssetInventory.status=\(status)")
+        if status != .installed {
+            if let request = try await AssetInventory.assetInstallationRequest(supporting: modules) {
+                debugLog("downloading/installing speech assets")
+                try await request.downloadAndInstall()
+                debugLog("asset installation completed")
+            } else {
+                debugLog("asset installation request unavailable")
+            }
+        }
+
+        debugLog("opening audio file")
+        let audioFile = try AVAudioFile(forReading: audioURL)
+        debugLog(
+            "audio format sampleRate=\(audioFile.processingFormat.sampleRate) channels=\(audioFile.processingFormat.channelCount) frames=\(audioFile.length)"
+        )
+        let analyzer = SpeechAnalyzer(modules: modules)
+
+        var resultTaskChunks: [TranscriptChunk] = []
+        let resultTask = Task {
+            var finalizedChunks: [TranscriptChunk] = []
+            var currentChunks: [TranscriptChunk] = []
+            var currentStart: Double?
+            var currentEnd: Double?
+            var rawResultCount = 0
+            var discardedVolatileCount = 0
+            for try await result in transcriber.results {
+                let attributedText = result.text
+                let text = String(attributedText.characters)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else {
+                    continue
+                }
+
+                let start = max(0.0, CMTimeGetSeconds(result.range.start))
+                let duration = max(0.0, CMTimeGetSeconds(result.range.duration))
+                let end = max(start, start + duration)
+                let splitChunks = splitResultText(
+                    text,
+                    start: start,
+                    end: end,
+                    confidence: averageConfidence(attributedText),
+                    locale: effectiveLocale.identifier
+                )
+                rawResultCount += 1
+
+                if let previousStart = currentStart, abs(start - previousStart) > 0.001 {
+                    if let previousEnd = currentEnd, previousEnd <= start + 0.5 {
+                        finalizedChunks.append(contentsOf: currentChunks)
+                    } else {
+                        discardedVolatileCount += currentChunks.count
+                    }
+                    currentChunks = []
+                }
+
+                currentStart = start
+                currentEnd = end
+                currentChunks = splitChunks
+            }
+            if currentStart != nil {
+                finalizedChunks.append(contentsOf: currentChunks)
+            }
+            debugLog(
+                "result stream finished raw=\(rawResultCount) finalizedChunks=\(finalizedChunks.count) discardedVolatile=\(discardedVolatileCount)"
+            )
+            return finalizedChunks
+        }
+
+        try await analyzer.start(inputAudioFile: audioFile, finishAfterFile: true)
+        resultTaskChunks = try await resultTask.value
+        let merged = mergeAdjacentDuplicates(resultTaskChunks)
+        debugLog("merged adjacent duplicates input=\(resultTaskChunks.count) output=\(merged.count)")
+        return merged
+    }
+
+    static func splitResultText(
+        _ text: String,
+        start: Double,
+        end: Double,
+        confidence: Double?,
+        locale: String?
+    ) -> [TranscriptChunk] {
         let cleaned = normalizeWhitespace(text)
         guard !cleaned.isEmpty else {
             return []
@@ -211,7 +347,9 @@ struct AppleDictationTranscriberTool {
             return [
                 TranscriptChunk(
                     timestamp: [roundToMillis(start), roundToMillis(end)],
-                    text: cleaned
+                    text: cleaned,
+                    confidence: confidence.map(roundToMillis),
+                    locale: locale
                 )
             ]
         }
@@ -222,9 +360,140 @@ struct AppleDictationTranscriberTool {
             let spanEnd = start + duration * (Double(span.endOffset) / Double(totalCount))
             return TranscriptChunk(
                 timestamp: [roundToMillis(spanStart), roundToMillis(max(spanStart, spanEnd))],
-                text: span.text
+                text: span.text,
+                confidence: confidence.map(roundToMillis),
+                locale: locale
             )
         }
+    }
+
+    @available(macOS 26.0, *)
+    static func averageConfidence(_ attributedText: AttributedString) -> Double? {
+        var weightedSum = 0.0
+        var totalCharacters = 0
+
+        for run in attributedText.runs {
+            guard let confidence = run[AttributeScopes.SpeechAttributes.ConfidenceAttribute.self] else {
+                continue
+            }
+            let text = String(attributedText[run.range].characters)
+            let count = max(1, text.count)
+            weightedSum += confidence * Double(count)
+            totalCharacters += count
+        }
+
+        guard totalCharacters > 0 else {
+            return nil
+        }
+        return max(0.0, min(1.0, weightedSum / Double(totalCharacters)))
+    }
+
+    static func selectBestTimeline(_ chunks: [TranscriptChunk]) -> [TranscriptChunk] {
+        let validChunks = chunks.filter { chunk in
+            guard let start = chunk.timestamp.first,
+                  let end = chunk.timestamp.dropFirst().first else {
+                return false
+            }
+            return end > start && !chunk.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        let sorted = validChunks.sorted { left, right in
+            let leftEnd = left.timestamp.dropFirst().first ?? 0.0
+            let rightEnd = right.timestamp.dropFirst().first ?? 0.0
+            if leftEnd == rightEnd {
+                return chunkScore(left) > chunkScore(right)
+            }
+            return leftEnd < rightEnd
+        }
+
+        guard !sorted.isEmpty else {
+            return []
+        }
+
+        var previousCompatible = Array(repeating: 0, count: sorted.count)
+        for index in sorted.indices {
+            let start = sorted[index].timestamp.first ?? 0.0
+            var compatible = 0
+            for candidate in stride(from: index - 1, through: 0, by: -1) {
+                let candidateEnd = sorted[candidate].timestamp.dropFirst().first ?? 0.0
+                if candidateEnd <= start + 0.25 {
+                    compatible = candidate + 1
+                    break
+                }
+            }
+            previousCompatible[index] = compatible
+        }
+
+        var bestScores = Array(repeating: 0.0, count: sorted.count + 1)
+        var selected = Array(repeating: false, count: sorted.count)
+        for index in sorted.indices {
+            let includeScore = chunkScore(sorted[index]) + bestScores[previousCompatible[index]]
+            let excludeScore = bestScores[index]
+            if includeScore > excludeScore {
+                bestScores[index + 1] = includeScore
+                selected[index] = true
+            } else {
+                bestScores[index + 1] = excludeScore
+            }
+        }
+
+        var output: [TranscriptChunk] = []
+        var index = sorted.count - 1
+        while index >= 0 {
+            let includeScore = chunkScore(sorted[index]) + bestScores[previousCompatible[index]]
+            let excludeScore = bestScores[index]
+            if selected[index] && includeScore >= excludeScore {
+                output.append(sorted[index])
+                index = previousCompatible[index] - 1
+            } else {
+                index -= 1
+            }
+        }
+
+        return output.reversed().sorted { left, right in
+            (left.timestamp.first ?? 0.0) < (right.timestamp.first ?? 0.0)
+        }
+    }
+
+    static func chunkScore(_ chunk: TranscriptChunk) -> Double {
+        let start = chunk.timestamp.first ?? 0.0
+        let end = chunk.timestamp.dropFirst().first ?? start
+        let duration = max(0.1, end - start)
+        let confidence = chunk.confidence ?? 0.5
+        return duration * confidence * textQualityScore(chunk.text, locale: chunk.locale)
+    }
+
+    static func textQualityScore(_ text: String, locale: String?) -> Double {
+        let characters = text.filter { !$0.isWhitespace }
+        guard !characters.isEmpty else {
+            return 0.0
+        }
+
+        let replacementPenalty = text.contains("�") ? 0.5 : 1.0
+        let repeatedPunctuationPenalty = text.contains("...") || text.contains("???") ? 0.8 : 1.0
+        let cjkCount = characters.filter { character in
+            character.unicodeScalars.contains { scalar in
+                (0x3040...0x30FF).contains(Int(scalar.value)) ||
+                    (0x3400...0x9FFF).contains(Int(scalar.value))
+            }
+        }.count
+        let asciiLetterCount = characters.filter { character in
+            character.unicodeScalars.allSatisfy { scalar in
+                (65...90).contains(Int(scalar.value)) || (97...122).contains(Int(scalar.value))
+            }
+        }.count
+
+        let localeIdentifier = locale ?? ""
+        let languageFit: Double
+        if localeIdentifier.hasPrefix("ja") {
+            languageFit = cjkCount > 0 ? 1.0 : 0.65
+        } else if localeIdentifier.hasPrefix("en") {
+            languageFit = asciiLetterCount > 0 ? 1.0 : 0.65
+        } else {
+            languageFit = 1.0
+        }
+
+        let veryShortPenalty = characters.count <= 2 ? 0.55 : 1.0
+        return replacementPenalty * repeatedPunctuationPenalty * languageFit * veryShortPenalty
     }
 
     static func splitIntoReadableSpans(_ text: String) -> [TextSpan] {

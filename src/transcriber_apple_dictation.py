@@ -8,18 +8,41 @@ MINIMUM_MACOS_SDK = (26, 0)
 MACOS_SDK_ROOTS = [
     Path("/Library/Developer/CommandLineTools/SDKs"),
     Path("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"),
+    Path("/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"),
 ]
 
 
 class AppleDictationTranscriber:
-    def __init__(self, audio_path: str, locale: str = "en-US"):
+    def __init__(
+        self,
+        audio_path: str,
+        locale: str = "en-US",
+        compare_locale: str | None = None,
+        engine: str = "speech-progressive",
+    ):
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
+        if engine not in {"dictation", "speech-progressive"}:
+            raise ValueError("engine must be 'dictation' or 'speech-progressive'")
         self.audio_path = audio_path
         self.locale = locale
+        self.compare_locale = compare_locale
+        self.engine = engine
         self.project_root = Path(__file__).resolve().parents[1]
-        self.source_path = self.project_root / "tools" / "apple_dictation_transcriber.swift"
-        self.info_plist_path = self.project_root / "tools" / "apple_dictation_transcriber_Info.plist"
+        self.source_path = (
+            self.project_root
+            / "tools"
+            / "AppleDictationTools"
+            / "AppleDictationTranscriber"
+            / "main.swift"
+        )
+        self.info_plist_path = (
+            self.project_root
+            / "tools"
+            / "AppleDictationTools"
+            / "AppleDictationTranscriber"
+            / "Info.plist"
+        )
         self.binary_path = self.project_root / ".build" / "apple_dictation_transcriber"
 
     def transcribe(self, transcript_path: str, subtitle_path: str):
@@ -37,7 +60,11 @@ class AppleDictationTranscriber:
             subtitle_path,
             "--locale",
             self.locale,
+            "--engine",
+            self.engine,
         ]
+        if self.compare_locale:
+            command.extend(["--compare-locale", self.compare_locale])
         try:
             subprocess.run(
                 command,

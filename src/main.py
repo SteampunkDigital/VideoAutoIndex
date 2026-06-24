@@ -14,6 +14,14 @@ from .web_generator import WebGenerator
 WHISPER_DEVICE_BY_PLATFORM = {
     "Darwin": "mps",
 }
+WHISPER_LANGUAGE_BY_TRANSCRIPTION_LANGUAGE = {
+    "en": "en",
+    "ja": "ja",
+}
+APPLE_LOCALE_BY_TRANSCRIPTION_LANGUAGE = {
+    "en": "en-US",
+    "ja": "ja-JP",
+}
 
 def load_env_file(env_path: str = ".env"):
     """Load simple KEY=value entries from a .env file without overriding the shell."""
@@ -95,16 +103,44 @@ def get_api_config(args):
     
     return provider, key
 
-def create_transcriber(audio_path: str, transcriber_name: str = "whisper", device_id: str = None):
+def whisper_language_for_transcription_language(transcription_language: str) -> str:
+    """Return the Whisper language code for a supported transcription language."""
+    return WHISPER_LANGUAGE_BY_TRANSCRIPTION_LANGUAGE[transcription_language]
+
+def apple_locale_for_transcription_language(transcription_language: str) -> str:
+    """Return the Apple Dictation locale for a supported transcription language."""
+    return APPLE_LOCALE_BY_TRANSCRIPTION_LANGUAGE[transcription_language]
+
+def create_transcriber(
+    audio_path: str,
+    transcriber_name: str = "whisper",
+    device_id: str = None,
+    transcription_language: str = "en",
+    compare_transcription_language: str | None = None,
+    apple_transcription_engine: str = "speech-progressive",
+):
     """Create the configured audio transcriber."""
     if transcriber_name == "whisper":
         from .transcriber import Transcriber
 
-        return Transcriber(audio_path, device_id=device_id or default_whisper_device_id())
+        return Transcriber(
+            audio_path,
+            device_id=device_id or default_whisper_device_id(),
+            language=whisper_language_for_transcription_language(transcription_language),
+        )
     if transcriber_name == "dictation":
         from .transcriber_apple_dictation import AppleDictationTranscriber
 
-        return AppleDictationTranscriber(audio_path)
+        return AppleDictationTranscriber(
+            audio_path,
+            locale=apple_locale_for_transcription_language(transcription_language),
+            compare_locale=(
+                apple_locale_for_transcription_language(compare_transcription_language)
+                if compare_transcription_language
+                else None
+            ),
+            engine=apple_transcription_engine,
+        )
     raise ValueError("transcriber_name must be 'whisper' or 'dictation'")
 
 def transcriber_for_provider(api_provider: str):
@@ -116,7 +152,9 @@ def transcriber_for_provider(api_provider: str):
     raise ValueError("api_provider must be 'anthropic', 'openai', or 'apple'")
 
 def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None,
-                 api_provider: str = None, api_key: str = None):
+                 api_provider: str = None, api_key: str = None, transcription_language: str = "en",
+                 compare_transcription_language: str | None = None,
+                 apple_transcription_engine: str = "speech-progressive"):
     """
     Main processing pipeline for video indexing.
     
@@ -126,6 +164,9 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         device_id: Device ID for Whisper inference ("0" for CPU/CUDA, "mps" for Darwin)
         skip_to: Stage to skip to ('transcribe', 'analyze', or 'generate')
         api_provider: Running mode. Apple uses Apple Dictation; OpenAI/Anthropic use Whisper.
+        transcription_language: Native transcription language ("en" or "ja")
+        compare_transcription_language: Optional second Apple transcription language to compare.
+        apple_transcription_engine: Apple Speech engine ("dictation" or "speech-progressive").
     """
     os.makedirs(output_dir, exist_ok=True)
     print("\nProcessing video...")
@@ -148,7 +189,14 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         print("2. Transcribing audio...")
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
-        transcriber = create_transcriber(audio_path, transcriber_name, device_id)
+        transcriber = create_transcriber(
+            audio_path,
+            transcriber_name,
+            device_id,
+            transcription_language,
+            compare_transcription_language if transcriber_name == "dictation" else None,
+            apple_transcription_engine,
+        )
         transcriber.transcribe(transcript_path, subtitle_path)
     
     if not skip_to or skip_to in ['analyze', 'transcribe']:
@@ -210,6 +258,13 @@ def main():
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
     parser.add_argument("--device-id", help='Override Whisper device ID ("mps" on Darwin by default, "0" on Windows/Linux)')
+    parser.add_argument("--transcription-language", choices=["en", "ja"], default="en",
+                       help="Native transcription language: en for English, ja for Japanese")
+    parser.add_argument("--compare-transcription-language", choices=["en", "ja"],
+                       help="Apple-only second transcription language to compare against the primary language")
+    parser.add_argument("--apple-transcription-engine", choices=["dictation", "speech-progressive"],
+                       default="speech-progressive",
+                       help="Apple-only speech engine to use for transcription")
     parser.add_argument("--skipto", choices=['transcribe', 'analyze', 'generate'], dest="skip_to",
                        help="Skip to a specific stage (transcribe, analyze, or generate)")
     
@@ -234,8 +289,17 @@ def main():
     if not api_provider:
         sys.exit(1)
     
-    process_video(args.video_path, args.output_dir, args.device_id, args.skip_to,
-                 api_provider, api_key)
+    process_video(
+        args.video_path,
+        args.output_dir,
+        args.device_id,
+        args.skip_to,
+        api_provider,
+        api_key,
+        args.transcription_language,
+        args.compare_transcription_language,
+        args.apple_transcription_engine,
+    )
 
 if __name__ == "__main__":
     main()

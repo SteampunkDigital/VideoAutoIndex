@@ -12,9 +12,37 @@ def test_apple_dictation_init(dummy_wav):
 
     assert transcriber.audio_path == dummy_wav
     assert transcriber.locale == "en-US"
-    assert transcriber.source_path.name == "apple_dictation_transcriber.swift"
-    assert transcriber.info_plist_path.name == "apple_dictation_transcriber_Info.plist"
+    assert transcriber.compare_locale is None
+    assert transcriber.engine == "speech-progressive"
+    assert transcriber.source_path.name == "main.swift"
+    assert transcriber.source_path.parent.name == "AppleDictationTranscriber"
+    assert transcriber.info_plist_path.name == "Info.plist"
+    assert transcriber.info_plist_path.parent.name == "AppleDictationTranscriber"
     assert transcriber.binary_path.name == "apple_dictation_transcriber"
+
+
+def test_apple_dictation_japanese_locale(dummy_wav):
+    transcriber = AppleDictationTranscriber(dummy_wav, locale="ja-JP")
+
+    assert transcriber.locale == "ja-JP"
+
+
+def test_apple_dictation_compare_locale(dummy_wav):
+    transcriber = AppleDictationTranscriber(dummy_wav, locale="ja-JP", compare_locale="en-US")
+
+    assert transcriber.locale == "ja-JP"
+    assert transcriber.compare_locale == "en-US"
+
+
+def test_apple_dictation_speech_progressive_engine(dummy_wav):
+    transcriber = AppleDictationTranscriber(dummy_wav, engine="speech-progressive")
+
+    assert transcriber.engine == "speech-progressive"
+
+
+def test_apple_dictation_invalid_engine(dummy_wav):
+    with pytest.raises(ValueError, match="engine"):
+        AppleDictationTranscriber(dummy_wav, engine="invalid")
 
 
 def test_apple_dictation_init_invalid_path():
@@ -51,10 +79,31 @@ def test_apple_dictation_transcribe_runs_binary(dummy_wav, temp_dir, monkeypatch
                 subtitle_path,
                 "--locale",
                 "en-GB",
+                "--engine",
+                "speech-progressive",
             ],
             {"check": True, "capture_output": True, "text": True},
         )
     ]
+
+
+def test_apple_dictation_transcribe_runs_binary_with_compare_locale(dummy_wav, temp_dir, monkeypatch):
+    transcriber = AppleDictationTranscriber(dummy_wav, locale="ja-JP", compare_locale="en-US")
+    monkeypatch.setattr(transcriber, "_ensure_binary", lambda: None)
+
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    transcript_path = os.path.join(temp_dir, "audio_transcript.json")
+    subtitle_path = os.path.join(temp_dir, "audio_subtitles.srt")
+    transcriber.transcribe(transcript_path, subtitle_path)
+
+    assert calls[0][0][-4:] == ["--engine", "speech-progressive", "--compare-locale", "en-US"]
 
 
 def test_apple_dictation_binary_current(dummy_wav, temp_dir):
@@ -98,6 +147,12 @@ def test_apple_dictation_uses_newest_supported_sdk(dummy_wav, temp_dir, monkeypa
 
     assert sdk_path == str(sdk_root / "MacOSX27.0.sdk")
     assert sdk_version == (27, 0)
+
+
+def test_apple_dictation_sdk_roots_include_xcode_beta():
+    import src.transcriber_apple_dictation as apple_dictation
+
+    assert Path("/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs") in apple_dictation.MACOS_SDK_ROOTS
 
 
 def test_apple_dictation_compile_target_matches_sdk(dummy_wav, temp_dir, monkeypatch):

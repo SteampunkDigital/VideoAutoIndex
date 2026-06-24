@@ -360,6 +360,7 @@ struct AppleFoundationKeyMomentsTool {
     static func analysisInstructions() -> String {
         """
         You are a meeting analyzer that identifies key moments and takeaways.
+        Write all JSON string values in English. Translate non-English transcript content into English.
         Return only a valid JSON array. Do not include Markdown, code fences, commentary, or extra text.
         """
     }
@@ -368,6 +369,8 @@ struct AppleFoundationKeyMomentsTool {
         """
         Analyze this meeting transcript and break it down into major topics.
         For each topic, identify key moments and extract actionable takeaways.
+        The transcript may be in English, Japanese, or another language. Write all JSON string values in English,
+        translating transcript content when needed.
 
         Required JSON shape:
         [
@@ -391,6 +394,9 @@ struct AppleFoundationKeyMomentsTool {
         - Timestamps must use exact SRT format from the transcript: HH:MM:SS,mmm.
         - Key moments should capture significant points, decisions, or transitions.
         - Takeaways should be actionable items or important conclusions.
+        - Translate topic names, key moment descriptions, and takeaways into English.
+        - Preserve timestamps exactly from the SRT transcript.
+        - Do not translate or alter timestamp strings.
         - Keep descriptions concise but informative.
         - Respond only with the JSON array.
 
@@ -402,6 +408,7 @@ struct AppleFoundationKeyMomentsTool {
     static func outlineInstructions() -> String {
         """
         You identify high-level topic boundaries in meeting transcripts.
+        Write topic descriptions in English, translating non-English transcript content when needed.
         Return only a valid JSON array. Do not include Markdown, code fences, commentary, or extra text.
         """
     }
@@ -422,7 +429,8 @@ struct AppleFoundationKeyMomentsTool {
         Rules:
         - Cover the whole transcript in chronological order.
         - Use exact timestamps that appear in the SRT timing lines.
-        - Keep topic descriptions concise.
+        - Keep topic descriptions concise and in English.
+        - Do not translate or alter timestamp strings.
 
         Transcript:
         \(subtitleContent)
@@ -432,6 +440,8 @@ struct AppleFoundationKeyMomentsTool {
     static func singleTopicPrompt(section: TopicSection, subtitleContent: String) -> String {
         """
         Analyze only this one topic section from a meeting transcript.
+        The section may be in English, Japanese, or another language. Write all JSON string values in English,
+        translating transcript content when needed.
 
         Topic: \(section.topic)
         Topic range: \(section.start) to \(section.end)
@@ -456,6 +466,9 @@ struct AppleFoundationKeyMomentsTool {
         - Timestamps must use exact SRT format from this section.
         - Include 1 to 5 key moments.
         - Include 1 to 5 concise takeaways.
+        - Translate topic names, key moment descriptions, and takeaways into English.
+        - Preserve timestamps exactly from the SRT transcript.
+        - Do not translate or alter timestamp strings.
         - Respond only with the JSON object.
 
         Section transcript:

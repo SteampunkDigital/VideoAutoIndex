@@ -1,4 +1,3 @@
-import AVFoundation
 import Foundation
 import Speech
 
@@ -6,7 +5,6 @@ import Speech
 struct AppleSpeechProbe {
     static func main() async {
         let locale = Locale(identifier: CommandLine.arguments.dropFirst().first ?? "en-US")
-        let audioPath = CommandLine.arguments.dropFirst(2).first
 
         if #available(macOS 26.0, *) {
             print("SpeechTranscriber.isAvailable=\(SpeechTranscriber.isAvailable)")
@@ -37,10 +35,6 @@ struct AppleSpeechProbe {
             await probe("dictation.timeIndexedLongDictation") {
                 DictationTranscriber(locale: locale, preset: .timeIndexedLongDictation)
             }
-
-            if let audioPath {
-                await probeLegacyRecognition(audioURL: URL(fileURLWithPath: audioPath), locale: locale)
-            }
         } else {
             print("requires macOS 26.0 or newer")
         }
@@ -52,63 +46,7 @@ struct AppleSpeechProbe {
         let modules: [any SpeechModule] = [module]
         let status = await AssetInventory.status(forModules: modules)
         print("\(name): status=\(status)")
-        do {
-            _ = try await SpeechAnalyzer(modules: modules)
-            print("\(name): analyzer=ok")
-        } catch {
-            print("\(name): analyzer=ERROR \(error)")
-        }
-    }
-
-    static func probeLegacyRecognition(audioURL: URL, locale: Locale) async {
-        print("legacy.audio=\(audioURL.path)")
-        guard let recognizer = SFSpeechRecognizer(locale: locale) else {
-            print("legacy.error=missing recognizer")
-            return
-        }
-
-        let status = await withCheckedContinuation { continuation in
-            SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status)
-            }
-        }
-        print("legacy.authorization=\(status.rawValue)")
-        guard status == .authorized else {
-            return
-        }
-
-        let request = SFSpeechURLRecognitionRequest(url: audioURL)
-        request.shouldReportPartialResults = false
-        if #available(macOS 10.15, *) {
-            request.requiresOnDeviceRecognition = false
-        }
-
-        await withCheckedContinuation { continuation in
-            var resumed = false
-            let task = recognizer.recognitionTask(with: request) { result, error in
-                if let result {
-                    print("legacy.final=\(result.isFinal)")
-                    print("legacy.text=\(result.bestTranscription.formattedString)")
-                    print("legacy.segments=\(result.bestTranscription.segments.count)")
-                }
-                if error != nil || result?.isFinal == true {
-                    if let error {
-                        print("legacy.error=\(error)")
-                    }
-                    if !resumed {
-                        resumed = true
-                        continuation.resume()
-                    }
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-                if !resumed {
-                    task.cancel()
-                    resumed = true
-                    print("legacy.timeout=30s")
-                    continuation.resume()
-                }
-            }
-        }
+        _ = SpeechAnalyzer(modules: modules)
+        print("\(name): analyzer=ok")
     }
 }

@@ -8,11 +8,13 @@ from src.main import (
     check_ffmpeg,
     check_python_dependencies,
     check_api_key,
+    apple_locale_for_transcription_language,
     create_transcriber,
     get_api_config,
     transcriber_for_provider,
     default_whisper_device_id,
     load_env_file,
+    whisper_language_for_transcription_language,
 )
 
 @pytest.fixture
@@ -93,12 +95,46 @@ def test_create_transcriber_defaults_to_whisper(dummy_wav):
     transcriber = create_transcriber(dummy_wav)
 
     assert transcriber.__class__.__name__ == "Transcriber"
+    assert transcriber.language == "en"
 
 def test_create_transcriber_dictation(dummy_wav):
     """Test dictation transcriber selection uses Apple Speech wrapper."""
     transcriber = create_transcriber(dummy_wav, "dictation")
 
     assert transcriber.__class__.__name__ == "AppleDictationTranscriber"
+    assert transcriber.locale == "en-US"
+    assert transcriber.compare_locale is None
+    assert transcriber.engine == "speech-progressive"
+
+def test_create_transcriber_threads_japanese_language(dummy_wav):
+    """Test Japanese transcription maps to each backend's native language value."""
+    whisper = create_transcriber(dummy_wav, "whisper", transcription_language="ja")
+    dictation = create_transcriber(dummy_wav, "dictation", transcription_language="ja")
+
+    assert whisper.language == "ja"
+    assert dictation.locale == "ja-JP"
+
+
+def test_create_transcriber_threads_apple_compare_language_and_engine(dummy_wav):
+    """Test Apple comparison language and engine are passed to the wrapper."""
+    dictation = create_transcriber(
+        dummy_wav,
+        "dictation",
+        transcription_language="ja",
+        compare_transcription_language="en",
+        apple_transcription_engine="speech-progressive",
+    )
+
+    assert dictation.locale == "ja-JP"
+    assert dictation.compare_locale == "en-US"
+    assert dictation.engine == "speech-progressive"
+
+def test_transcription_language_mappings():
+    """Test CLI language values map to backend-specific values."""
+    assert whisper_language_for_transcription_language("en") == "en"
+    assert whisper_language_for_transcription_language("ja") == "ja"
+    assert apple_locale_for_transcription_language("en") == "en-US"
+    assert apple_locale_for_transcription_language("ja") == "ja-JP"
 
 def test_create_transcriber_invalid_name(dummy_wav):
     """Test invalid transcriber selection fails clearly."""

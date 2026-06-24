@@ -16,6 +16,7 @@ MINIMUM_MACOS_SDK = (26, 0)
 MACOS_SDK_ROOTS = [
     Path("/Library/Developer/CommandLineTools/SDKs"),
     Path("/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"),
+    Path("/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs"),
 ]
 
 class KeyMomentsExtractor:
@@ -39,8 +40,20 @@ class KeyMomentsExtractor:
         self.subtitle_path = subtitle_path
         self.api_provider = api_provider
         self.project_root = Path(__file__).resolve().parents[1]
-        self.source_path = self.project_root / "tools" / "apple_foundation_key_moments.swift"
-        self.info_plist_path = self.project_root / "tools" / "apple_foundation_key_moments_Info.plist"
+        self.source_path = (
+            self.project_root
+            / "tools"
+            / "AppleDictationTools"
+            / "AppleFoundationKeyMoments"
+            / "main.swift"
+        )
+        self.info_plist_path = (
+            self.project_root
+            / "tools"
+            / "AppleDictationTools"
+            / "AppleFoundationKeyMoments"
+            / "Info.plist"
+        )
         self.binary_path = self.project_root / ".build" / "apple_foundation_key_moments"
         self.anthropic = None
         self.openai = None
@@ -76,6 +89,8 @@ class KeyMomentsExtractor:
         # Prepare the prompt for Claude
         prompt = f"""Analyze this meeting transcript and break it down into major topics.
         For each topic, identify its key moments and extract actionable takeaways.
+        The transcript may be in English, Japanese, or another language. Write all JSON
+        string values in English, translating transcript content when needed.
         Format your response as a JSON array where each object represents a topic section with this structure:
 
         [
@@ -100,6 +115,9 @@ class KeyMomentsExtractor:
         - Timestamps must match the exact SRT format from the transcript (HH:MM:SS,mmm)
         - Key moments should capture significant points, decisions, or transitions
         - Takeaways should be actionable items or important conclusions
+        - Translate topic names, key moment descriptions, and takeaways into English
+        - Preserve timestamps exactly from the SRT transcript
+        - Do not translate or alter timestamp strings
         - Keep descriptions concise but informative
 
         Transcript:
@@ -134,7 +152,7 @@ class KeyMomentsExtractor:
                 with self.anthropic.messages.stream(
                     model="claude-opus-4-1-20250805",
                     max_tokens=16384,
-                    system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
+                    system="You are a meeting analyzer that breaks down discussions into English topics, key moments, and takeaways. Translate non-English transcript content into English in the JSON output. You only respond with properly formatted JSON.",
                     messages=[{
                         "role": "user",
                         "content": prompt
@@ -149,7 +167,7 @@ class KeyMomentsExtractor:
             response = self.anthropic.messages.create(
                 model="claude-opus-4-1-20250805",
                 max_tokens=16384,
-                system="You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON.",
+                system="You are a meeting analyzer that breaks down discussions into English topics, key moments, and takeaways. Translate non-English transcript content into English in the JSON output. You only respond with properly formatted JSON.",
                 messages=[{
                     "role": "user",
                     "content": prompt
@@ -174,7 +192,7 @@ class KeyMomentsExtractor:
             api_params = {
                 "model": self.openai_model,
                 "messages": [
-                    {"role": "system", "content": "You are a meeting analyzer that breaks down discussions into topics, key moments, and takeaways. You only respond with properly formatted JSON."},
+                    {"role": "system", "content": "You are a meeting analyzer that breaks down discussions into English topics, key moments, and takeaways. Translate non-English transcript content into English in the JSON output. You only respond with properly formatted JSON."},
                     {"role": "user", "content": prompt}
                 ],
                 "max_completion_tokens": 16384
@@ -246,6 +264,7 @@ class KeyMomentsExtractor:
             if not all(field in topic for field in required_fields):
                 raise ValueError(f"Missing required fields in topic: {required_fields}")
 
+            topic['timestamp'] = self._normalize_timestamp(topic['timestamp'])
             self._validate_timestamp_format(topic['timestamp'])
 
             if not isinstance(topic['key_moments'], list):
@@ -255,6 +274,7 @@ class KeyMomentsExtractor:
                     raise ValueError("Invalid key moment format")
                 if 'description' not in moment or 'timestamp' not in moment:
                     raise ValueError("Missing required fields in key moment")
+                moment['timestamp'] = self._normalize_timestamp(moment['timestamp'])
                 self._validate_timestamp_format(moment['timestamp'])
 
             if not isinstance(topic['takeaways'], list):
@@ -381,6 +401,20 @@ class KeyMomentsExtractor:
             raise ValueError(
                 f"Invalid timestamp format: {timestamp}. Expected format: HH:MM:SS,mmm"
             )
+
+    def _normalize_timestamp(self, timestamp: str) -> str:
+        """
+        Normalize model-produced timestamps to the single SRT timestamp used by the UI.
+
+        Apple Foundation Models sometimes returns a full SRT cue range
+        ("HH:MM:SS,mmm --> HH:MM:SS,mmm") even though the prompt asks for a
+        single timestamp. Use the range start as the seek target.
+        """
+        if not isinstance(timestamp, str):
+            raise ValueError(
+                f"Invalid timestamp format: {timestamp}. Expected format: HH:MM:SS,mmm"
+            )
+        return timestamp.split("-->", 1)[0].strip()
 
     def _parse_timestamp(self, timestamp: str) -> float:
         """
