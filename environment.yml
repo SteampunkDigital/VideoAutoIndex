@@ -4,6 +4,9 @@ channels:
   - defaults
 dependencies:
   - python=3.11
+  # TorchCodec currently supports FFmpeg 4-8. Keep a compatible shared
+  # library inside the environment instead of relying on Homebrew's FFmpeg.
+  - "ffmpeg>=8,<9"
   - pip
   - pip:
     - "insanely-fast-whisper @ git+https://github.com/Vaibhavs10/insanely-fast-whisper"  # Install from git to bypass Python version check

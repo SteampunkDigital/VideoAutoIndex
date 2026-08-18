@@ -36,28 +36,18 @@ from the `main` branch with `/docs` as the Pages folder.
 
 ## Installation
 
-1. Install ffmpeg:
-   ```bash
-   # macOS
-   brew install ffmpeg
-
-   # Ubuntu/Debian
-   sudo apt-get install ffmpeg
-
-   # Windows
-   # Download from https://ffmpeg.org/download.html
-   ```
-
-2. Set up the conda environment:
+1. Set up the conda environment:
    ```bash
    # Create and activate the conda environment
    conda env create -f environment.yml
    conda activate video-auto-index
    ```
 
-   This will automatically install all dependencies, including insanely-fast-whisper.
+   This installs all dependencies, including insanely-fast-whisper and a
+   TorchCodec-compatible FFmpeg release. The pinned environment FFmpeg avoids
+   incompatibilities with newer system or Homebrew FFmpeg releases.
 
-3. Create a `.env` file for API-backed modes:
+2. Create a `.env` file for API-backed modes:
    ```bash
    cp .env.example .env
    ```

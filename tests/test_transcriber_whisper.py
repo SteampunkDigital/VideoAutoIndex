@@ -34,6 +34,22 @@ def test_transcriber_init(test_audio):
     assert transcriber.audio_path == test_audio
     assert transcriber.language == "en"
 
+def test_whisper_executable_prefers_active_python_environment(test_audio, monkeypatch):
+    """Avoid selecting a stale user-level CLI ahead of the active environment."""
+    searches = []
+
+    def fake_which(command, path=None):
+        searches.append((command, path))
+        return "/active-env/bin/insanely-fast-whisper" if path is not None else "/user/bin/insanely-fast-whisper"
+
+    monkeypatch.setattr("src.transcriber_whisper.sys.executable", "/active-env/bin/python")
+    monkeypatch.setattr("src.transcriber_whisper.shutil.which", fake_which)
+
+    transcriber = Transcriber(test_audio)
+
+    assert transcriber._whisper_executable() == "/active-env/bin/insanely-fast-whisper"
+    assert searches == [("insanely-fast-whisper", "/active-env/bin")]
+
 def test_transcribe_passes_configured_language(test_audio, temp_dir, monkeypatch):
     """Test Whisper command uses the configured native transcription language."""
     transcript_path = os.path.join(temp_dir, "audio_transcript.json")

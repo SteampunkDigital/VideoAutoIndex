@@ -1,7 +1,9 @@
 import json
 import os
 import platform
+import shutil
 import subprocess
+import sys
 from datetime import timedelta
 
 
@@ -31,6 +33,15 @@ class Transcriber:
             "mps" if platform.system() == "Darwin" else "0"
         )
         self.language = language
+
+    def _whisper_executable(self) -> str:
+        """Prefer insanely-fast-whisper installed beside the active Python."""
+        environment_bin = os.path.dirname(sys.executable)
+        return (
+            shutil.which("insanely-fast-whisper", path=environment_bin)
+            or shutil.which("insanely-fast-whisper")
+            or "insanely-fast-whisper"
+        )
 
     def _format_timestamp(self, seconds: float) -> str:
         """Convert seconds to SRT timestamp format (HH:MM:SS,mmm)."""
@@ -86,7 +97,7 @@ class Transcriber:
             # Run transcription to get JSON output
             result = subprocess.run(
                 [
-                    "insanely-fast-whisper",
+                    self._whisper_executable(),
                     "--file-name",
                     self.audio_path,
                     "--transcript-path",
