@@ -11,7 +11,7 @@ from openai import OpenAI
 import openai
 import anthropic
 
-DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+DEFAULT_OPENAI_MODEL = "gpt-5.6-terra"
 MINIMUM_MACOS_SDK = (26, 0)
 MACOS_SDK_ROOTS = [
     Path("/Library/Developer/CommandLineTools/SDKs"),

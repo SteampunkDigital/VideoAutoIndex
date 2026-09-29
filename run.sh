@@ -1,28 +1,18 @@
 #!/bin/bash
 
 # Script to run video auto-indexing
-# Usage: ./run.sh [video_file_path] [apple|openai|anthropic] [en|ja]
-# Default mode: apple
-# Default transcription language: en
+# Usage: ./run.sh [video_file_path] [apple|openai|anthropic]
+# Default mode: openai if OPENAI_API_KEY is set, then anthropic if
+# ANTHROPIC_API_KEY is set, otherwise apple (keys loaded from .env).
+# Transcription language: en
 
 # Set the conda environment and project directory
 CONDA_ENV="video-auto-index"
 VIDEO_FILE="${1}"
-MODE="${2:-apple}"
-TRANSCRIPTION_LANGUAGE="${3:-en}"
+MODE="${2}"
 
 if [ -z "$VIDEO_FILE" ]; then
-    echo "Usage: ./run.sh [video_file_path] [apple|openai|anthropic] [en|ja]"
-    exit 1
-fi
-
-if [ "$MODE" != "apple" ] && [ "$MODE" != "openai" ] && [ "$MODE" != "anthropic" ]; then
-    echo "Error: mode must be 'apple', 'openai', or 'anthropic'"
-    exit 1
-fi
-
-if [ "$TRANSCRIPTION_LANGUAGE" != "en" ] && [ "$TRANSCRIPTION_LANGUAGE" != "ja" ]; then
-    echo "Error: transcription language must be 'en' or 'ja'"
+    echo "Usage: ./run.sh [video_file_path] [apple|openai|anthropic]"
     exit 1
 fi
 
@@ -31,6 +21,21 @@ if [ -f ".env" ]; then
     set -a
     source ".env"
     set +a
+fi
+
+if [ -z "$MODE" ]; then
+    if [ -n "$OPENAI_API_KEY" ]; then
+        MODE="openai"
+    elif [ -n "$ANTHROPIC_API_KEY" ]; then
+        MODE="anthropic"
+    else
+        MODE="apple"
+    fi
+fi
+
+if [ "$MODE" != "apple" ] && [ "$MODE" != "openai" ] && [ "$MODE" != "anthropic" ]; then
+    echo "Error: mode must be 'apple', 'openai', or 'anthropic'"
+    exit 1
 fi
 
 missing_vars=()
@@ -52,6 +57,5 @@ eval "$(conda shell.bash hook)"
 conda activate "$CONDA_ENV"
 
 # Run the Python script with the video file
-echo "Running VideoAutoIndex in $MODE mode with $TRANSCRIPTION_LANGUAGE transcription"
-args=("$VIDEO_FILE" "--$MODE" --transcription-language "$TRANSCRIPTION_LANGUAGE")
-python -m src.main "${args[@]}"
+echo "Running VideoAutoIndex in $MODE mode with en transcription"
+python -m src.main "$VIDEO_FILE" "--$MODE" --transcription-language en

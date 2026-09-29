@@ -103,8 +103,12 @@ python -m src.main /path/to/video.mp4 --anthropic --output-dir output
 # Japanese native transcription plus English analysis
 python -m src.main /path/to/video.mp4 --apple --transcription-language ja --output-dir output
 
-# Shell wrapper: mode defaults to apple, language defaults to en
-./run.sh /path/to/video.mp4 apple ja
+# Shell wrapper: auto-selects OpenAI, then Anthropic, then Apple based on API keys
+# in .env or the shell; always transcribes in English
+./run.sh /path/to/video.mp4
+
+# Explicit mode override
+./run.sh /path/to/video.mp4 apple
 ```
 
 This will:
