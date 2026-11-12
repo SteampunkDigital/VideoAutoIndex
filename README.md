@@ -6,6 +6,10 @@ Automatically process meeting videos to extract key moments, topics, and takeawa
 
 View the GitHub Pages demo: https://steampunkdigital.github.io/VideoAutoIndex/
 
+The demo uses `videos/sample.mp4`, a conversation about a 3D sushi scan, with
+Nemotron transcription and diarization. Its reviewed speaker names are Narrator
+and Aaron; you can try renaming speakers, editing phrases, and copying feedback JSON.
+
 The demo is published from `docs/`, so GitHub Pages should be configured to deploy
 from the `main` branch with `/docs` as the Pages folder.
 
