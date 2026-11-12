@@ -105,7 +105,30 @@ def test_key_moments_prompt_translates_output_to_english(sample_srt, mock_anthro
     assert "string values in English" in prompt
     assert "Translate topic names, key moment descriptions, and takeaways into English" in prompt
     assert "Do not translate or alter timestamp strings" in prompt
+    assert "Overlapping cue time ranges represent simultaneous speech" in prompt
+    assert "do not infer identity across parts" in prompt
+    assert "uncertain or unknown speaker" in prompt
     assert "Translate non-English transcript content into English" in captured["system"]
+
+
+@pytest.mark.parametrize("provider", ["anthropic", "openai"])
+def test_summary_model_override_reaches_request(provider, sample_srt, monkeypatch, sample_analysis):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    client = Mock()
+    if provider == "anthropic":
+        client.messages = SimpleNamespace(create=Mock(return_value=SimpleNamespace(
+            content=[SimpleNamespace(text=json.dumps(sample_analysis))])))
+        monkeypatch.setattr("src.key_moments.Anthropic", Mock(return_value=client))
+    else:
+        client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(
+            message=SimpleNamespace(content=json.dumps(sample_analysis)))])
+        monkeypatch.setattr("src.key_moments.OpenAI", Mock(return_value=client))
+    extractor = KeyMomentsExtractor(sample_srt, api_provider=provider,
+                                    api_key="test-key", model_name="chosen-summary-model")
+    extractor.extract_key_moments()
+    request = client.messages.create if provider == "anthropic" else client.chat.completions.create
+    assert request.call_args.kwargs["model"] == "chosen-summary-model"
 
 def test_validate_timestamp_format(sample_srt, mock_anthropic_key):
     """Test timestamp format validation."""

@@ -361,6 +361,10 @@ struct AppleFoundationKeyMomentsTool {
         """
         You are a meeting analyzer that identifies key moments and takeaways.
         Write all JSON string values in English. Translate non-English transcript content into English.
+        Overlapping SRT cues represent simultaneous speech; retain both contributions.
+        Bracketed speaker labels identify voices, not verified identities. Labels prefixed with Part
+        are scoped to that upload; do not infer identity across parts. Do not assign statements or
+        action items to uncertain or unknown speakers.
         Return only a valid JSON array. Do not include Markdown, code fences, commentary, or extra text.
         """
     }

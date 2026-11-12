@@ -7,11 +7,8 @@ from src.main import (
     process_video,
     check_ffmpeg,
     check_python_dependencies,
-    check_api_key,
     apple_locale_for_transcription_language,
     create_transcriber,
-    get_api_config,
-    transcriber_for_provider,
     default_whisper_device_id,
     load_env_file,
     whisper_language_for_transcription_language,
@@ -70,26 +67,6 @@ def test_check_python_dependencies_missing(monkeypatch):
     monkeypatch.setattr("builtins.__import__", mock_import)
     assert check_python_dependencies() is False
 
-def test_check_api_key_set(monkeypatch):
-    """Test API key check when key is set."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy_key")
-    assert check_api_key() is True
-
-def test_check_api_key_not_set(monkeypatch):
-    """Test API key check when key is not set."""
-    if "ANTHROPIC_API_KEY" in os.environ:
-        monkeypatch.delenv("ANTHROPIC_API_KEY")
-    assert check_api_key() is False
-
-def test_get_api_config_apple_does_not_require_key():
-    """Test Apple Foundation Models selection does not require an API key."""
-    class Args:
-        apple = True
-        anthropic = None
-        openai = None
-
-    assert get_api_config(Args()) == ("apple", None)
-
 def test_create_transcriber_defaults_to_whisper(dummy_wav):
     """Test default transcriber selection uses Whisper compatibility path."""
     transcriber = create_transcriber(dummy_wav)
@@ -140,12 +117,6 @@ def test_create_transcriber_invalid_name(dummy_wav):
     """Test invalid transcriber selection fails clearly."""
     with pytest.raises(ValueError, match="transcriber_name"):
         create_transcriber(dummy_wav, "invalid")
-
-def test_transcriber_for_provider_consolidates_modes():
-    """Test each running mode maps to its fixed transcription backend."""
-    assert transcriber_for_provider("apple") == "apple_speech"
-    assert transcriber_for_provider("openai") == "whisper"
-    assert transcriber_for_provider("anthropic") == "whisper"
 
 def test_default_whisper_device_id(monkeypatch):
     """Test Whisper uses MPS on Darwin and 0 elsewhere."""

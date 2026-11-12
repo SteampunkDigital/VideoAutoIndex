@@ -1,9 +1,13 @@
 # web_generator.py
 import os
 import json
+import mimetypes
 from pathlib import Path
 from flask import Flask, render_template_string
 from typing import Dict, List
+from .transcript import format_timestamp, normalize_chunk
+
+SPEAKER_COLORS = ("#1d4ed8", "#9d174d", "#047857", "#6d28d9", "#92400e", "#0e7490")
 
 class WebGenerator:
     def __init__(self, analysis_path: str, video_path: str, transcript_path: str = None):
@@ -56,7 +60,7 @@ class WebGenerator:
         html = self._generate_html(analysis, video_rel_path, transcript)
         
         # Write HTML file
-        with open(output_path, "w") as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(html)
             
         return output_path
@@ -73,20 +77,28 @@ class WebGenerator:
         
         # Extract chunks and format for web display
         chunks = []
-        for chunk in transcript_data.get('chunks', []):
-            if 'timestamp' in chunk and 'text' in chunk and chunk['timestamp']:
-                timestamp = chunk['timestamp']
-                if len(timestamp) >= 2 and timestamp[0] is not None and timestamp[1] is not None:
-                    start_time, end_time = timestamp[0], timestamp[1]
-                    chunks.append({
-                        'start_seconds': start_time,
-                        'end_seconds': end_time,
-                        'text': chunk['text'].strip(),
-                        'start_time_formatted': self._seconds_to_timestamp(start_time),
-                        'end_time_formatted': self._seconds_to_timestamp(end_time)
-                    })
+        colors = {speaker: SPEAKER_COLORS[i % len(SPEAKER_COLORS)]
+                  for i, speaker in enumerate(transcript_data.get('speakers', []))
+                  if isinstance(speaker, str)}
+        for index, raw_chunk in enumerate(transcript_data.get('chunks', [])):
+            try:
+                chunk = normalize_chunk(raw_chunk, index)
+            except (ValueError, AttributeError):
+                continue
+            start_time, end_time = chunk['timestamp']
+            speaker = chunk.get('speaker')
+            if speaker and speaker not in colors:
+                colors[speaker] = SPEAKER_COLORS[len(colors) % len(SPEAKER_COLORS)]
+            chunks.append({
+                'id': chunk['id'], 'speaker': speaker,
+                'speaker_label': (speaker or 'Unknown speaker') if 'speaker' in chunk else None,
+                'speaker_color': colors.get(speaker, '#64748b'),
+                'start_seconds': start_time, 'end_seconds': end_time, 'text': chunk['text'],
+                'start_time_formatted': self._seconds_to_timestamp(start_time),
+                'end_time_formatted': self._seconds_to_timestamp(end_time)
+            })
         
-        return chunks
+        return sorted(chunks, key=lambda chunk: chunk['start_seconds'])
     
     def _seconds_to_timestamp(self, seconds: float) -> str:
         """
@@ -95,12 +107,7 @@ class WebGenerator:
         if seconds is None:
             return "00:00:00,000"
         
-        seconds = float(seconds)  # Ensure it's a float
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        ms = int((seconds % 1) * 1000)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d},{ms:03d}"
+        return format_timestamp(float(seconds))
     
     def _generate_html(self, analysis: List[Dict], video_rel_path: str, transcript: List[Dict] = None) -> str:
         """
@@ -150,7 +157,7 @@ class WebGenerator:
                     border-radius: 8px;
                     border: 1px solid #e5e7eb;
                 }
-                video {
+                video, audio {
                     display: block;
                     width: 100%;
                     max-height: calc(100vh - 68px);
@@ -207,6 +214,13 @@ class WebGenerator:
                     border-radius: 8px;
                 }
                 .transcript-chunk {
+                    display: block;
+                    width: 100%;
+                    text-align: left;
+                    font: inherit;
+                    color: inherit;
+                    border: 1px solid #e5e7eb;
+                    border-left: 4px solid var(--speaker-color, #64748b);
                     margin: 5px 0;
                     padding: 8px 12px;
                     background: white;
@@ -218,8 +232,21 @@ class WebGenerator:
                     background: #e3f2fd;
                 }
                 .transcript-chunk.active {
-                    background: #2196f3;
-                    color: white;
+                    background: #dbeafe;
+                    outline: 2px solid var(--speaker-color, #64748b);
+                    outline-offset: -2px;
+                }
+                .transcript-chunk.overlapping {
+                    background: #fef3c7;
+                }
+                .speaker-label {
+                    color: var(--speaker-color, #64748b);
+                    font-weight: 700;
+                    margin-right: 8px;
+                }
+                .overlap-status {
+                    color: #713f12;
+                    font-weight: 600;
                 }
                 .transcript-timestamp {
                     font-family: monospace;
@@ -228,7 +255,7 @@ class WebGenerator:
                     margin-right: 10px;
                 }
                 .transcript-chunk.active .transcript-timestamp {
-                    color: #bbdefb;
+                    color: #374151;
                 }
                 @media (max-width: 860px) {
                     body {
@@ -296,15 +323,20 @@ class WebGenerator:
             {% if transcript %}
             <div class="transcript-section">
                 <h2>Full Transcript</h2>
+                <p id="overlap-status" class="overlap-status" role="status" hidden>Simultaneous speech</p>
                 <div class="transcript">
                     {% for chunk in transcript %}
-                    <div class="transcript-chunk" 
+                    <button type="button" class="transcript-chunk"
+                         data-segment-id="{{ chunk.id }}"
+                         data-speaker="{{ chunk.speaker or '' }}"
+                         style="--speaker-color: {{ chunk.speaker_color }}"
                          data-start="{{ chunk.start_seconds }}" 
                          data-end="{{ chunk.end_seconds }}"
                          onclick="seekToTime({{ chunk.start_seconds }})">
-                        <span class="transcript-timestamp">{{ chunk.start_time_formatted }}</span>
+                        <span class="transcript-timestamp">{{ chunk.start_time_formatted }} – {{ chunk.end_time_formatted }}</span>
+                        {% if chunk.speaker_label %}<span class="speaker-label">{{ chunk.speaker_label }}</span>{% endif %}
                         {{ chunk.text }}
-                    </div>
+                    </button>
                     {% endfor %}
                 </div>
             </div>
@@ -313,10 +345,17 @@ class WebGenerator:
                 </main>
 
                 <aside class="video-container">
+                    {% if audio_only %}
+                    <audio id="meeting-video" controls>
+                        <source src="{{ video_rel_path }}" type="{{ media_type }}">
+                        Your browser does not support audio playback.
+                    </audio>
+                    {% else %}
                     <video id="meeting-video" controls>
-                        <source src="{{ video_rel_path }}" type="video/mp4">
-                        Your browser does not support the video tag.
+                        <source src="{{ video_rel_path }}" type="{{ media_type }}">
+                        Your browser does not support video playback.
                     </video>
+                    {% endif %}
                 </aside>
             </div>
 
@@ -342,21 +381,38 @@ class WebGenerator:
                 }
 
                 // Highlight current transcript segment during playback
+                let transcriptChunks = [];
+                let previousActiveChunks = new Set();
                 function updateTranscriptHighlight() {
                     const video = document.getElementById('meeting-video');
                     const currentTime = video.currentTime;
-                    const chunks = document.querySelectorAll('.transcript-chunk');
-                    
-                    chunks.forEach(chunk => {
-                        const startTime = parseFloat(chunk.dataset.start);
-                        const endTime = parseFloat(chunk.dataset.end);
-                        
-                        if (currentTime >= startTime && currentTime <= endTime) {
-                            chunk.classList.add('active');
-                        } else {
-                            chunk.classList.remove('active');
+                    const activeSpeakers = new Set();
+                    const activeChunks = new Set();
+                    transcriptChunks.forEach(({element, start, end, speaker}) => {
+                        if (currentTime >= start && currentTime < end) {
+                            activeChunks.add(element);
+                            if (speaker) activeSpeakers.add(speaker);
                         }
                     });
+                    // Only touch active or previously active DOM nodes, even on long recordings.
+                    previousActiveChunks.forEach(chunk => {
+                        if (!activeChunks.has(chunk)) {
+                            chunk.classList.remove('active');
+                            chunk.classList.remove('overlapping');
+                            chunk.removeAttribute('aria-current');
+                        }
+                    });
+                    const overlapping = activeSpeakers.size > 1;
+                    activeChunks.forEach(chunk => {
+                        if (!previousActiveChunks.has(chunk)) {
+                            chunk.classList.toggle('active', true);
+                            chunk.setAttribute('aria-current', 'true');
+                        }
+                        chunk.classList.toggle('overlapping', overlapping);
+                    });
+                    previousActiveChunks = activeChunks;
+                    const status = document.getElementById('overlap-status');
+                    if (status) status.hidden = !overlapping;
                 }
 
 
@@ -364,11 +420,34 @@ class WebGenerator:
                 document.addEventListener('DOMContentLoaded', function() {
                     const video = document.getElementById('meeting-video');
                     if (video) {
+                        transcriptChunks = Array.from(document.querySelectorAll('.transcript-chunk')).map(element => ({
+                            element, start: parseFloat(element.dataset.start),
+                            end: parseFloat(element.dataset.end), speaker: element.dataset.speaker
+                        }));
                         // Update transcript highlight as video plays
                         video.addEventListener('timeupdate', updateTranscriptHighlight);
                         
                         // Also update on seeking
                         video.addEventListener('seeked', updateTranscriptHighlight);
+                        video.addEventListener('seeking', updateTranscriptHighlight);
+                        video.addEventListener('loadedmetadata', updateTranscriptHighlight);
+                        // Short interjections can fall between timeupdate events.
+                        let frame = null;
+                        function tick() {
+                            updateTranscriptHighlight();
+                            frame = video.paused || video.ended ? null : requestAnimationFrame(tick);
+                        }
+                        video.addEventListener('play', function() {
+                            if (frame === null) tick();
+                        });
+                        function stopHighlightLoop() {
+                            if (frame !== null) cancelAnimationFrame(frame);
+                            frame = null;
+                            updateTranscriptHighlight();
+                        }
+                        video.addEventListener('pause', stopHighlightLoop);
+                        video.addEventListener('ended', stopHighlightLoop);
+                        updateTranscriptHighlight();
                     }
                 });
             </script>
@@ -383,5 +462,7 @@ class WebGenerator:
                 template,
                 analysis=analysis,
                 video_rel_path=video_rel_path,
-                transcript=transcript
+                transcript=transcript,
+                media_type=mimetypes.guess_type(str(self.video_path))[0] or 'video/mp4',
+                audio_only=(mimetypes.guess_type(str(self.video_path))[0] or '').startswith('audio/')
             )

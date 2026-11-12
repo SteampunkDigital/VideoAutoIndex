@@ -7,7 +7,7 @@ dependencies = [
     "anthropic",
     "ffmpeg-python",
     "flask",
-    "openai>=1.0.0",
+    "openai>=2.7.0",
 ]
 
 [project.optional-dependencies]

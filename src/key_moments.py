@@ -12,6 +12,7 @@ import openai
 import anthropic
 
 DEFAULT_OPENAI_MODEL = "gpt-5.6-terra"
+DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-1-20250805"
 MINIMUM_MACOS_SDK = (26, 0)
 MACOS_SDK_ROOTS = [
     Path("/Library/Developer/CommandLineTools/SDKs"),
@@ -25,6 +26,7 @@ class KeyMomentsExtractor:
         subtitle_path: str,
         api_provider: Literal["anthropic", "openai", "apple"] = "anthropic",
         api_key: Optional[str] = None,
+        model_name: Optional[str] = None,
     ):
         """
         Initialize the key moments extractor.
@@ -57,6 +59,9 @@ class KeyMomentsExtractor:
         self.binary_path = self.project_root / ".build" / "apple_foundation_key_moments"
         self.anthropic = None
         self.openai = None
+        if api_provider == "apple" and model_name:
+            raise ValueError("Apple summarization does not support a model override")
+        self.anthropic_model = model_name or DEFAULT_ANTHROPIC_MODEL
         
         if api_provider == "anthropic":
             api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
@@ -64,7 +69,7 @@ class KeyMomentsExtractor:
         elif api_provider == "openai":
             api_key = api_key or os.environ.get("OPENAI_API_KEY")
             self.openai = OpenAI(api_key=api_key)
-            self.openai_model = DEFAULT_OPENAI_MODEL
+            self.openai_model = model_name or DEFAULT_OPENAI_MODEL
             print(f"Using OpenAI model: {self.openai_model}")
         elif api_provider == "apple":
             pass
@@ -83,7 +88,7 @@ class KeyMomentsExtractor:
             - takeaways: List of actionable takeaways from this topic
         """
         # Read the subtitle file
-        with open(self.subtitle_path, 'r') as f:
+        with open(self.subtitle_path, 'r', encoding='utf-8') as f:
             subtitle_content = f.read()
 
         # Prepare the prompt for Claude
@@ -119,6 +124,10 @@ class KeyMomentsExtractor:
         - Preserve timestamps exactly from the SRT transcript
         - Do not translate or alter timestamp strings
         - Keep descriptions concise but informative
+        - Overlapping cue time ranges represent simultaneous speech; retain both contributions
+        - Bracketed speaker labels identify voices, not verified real-world identities
+        - Labels prefixed with Part are scoped to that upload; do not infer identity across parts
+        - Do not attribute statements or action items to an uncertain or unknown speaker
 
         Transcript:
         {subtitle_content}
@@ -150,7 +159,7 @@ class KeyMomentsExtractor:
             if hasattr(self.anthropic.messages, "stream"):
                 response_text = ""
                 with self.anthropic.messages.stream(
-                    model="claude-opus-4-1-20250805",
+                    model=self.anthropic_model,
                     max_tokens=16384,
                     system="You are a meeting analyzer that breaks down discussions into English topics, key moments, and takeaways. Translate non-English transcript content into English in the JSON output. You only respond with properly formatted JSON.",
                     messages=[{
@@ -165,7 +174,7 @@ class KeyMomentsExtractor:
                 return response_text
 
             response = self.anthropic.messages.create(
-                model="claude-opus-4-1-20250805",
+                model=self.anthropic_model,
                 max_tokens=16384,
                 system="You are a meeting analyzer that breaks down discussions into English topics, key moments, and takeaways. Translate non-English transcript content into English in the JSON output. You only respond with properly formatted JSON.",
                 messages=[{

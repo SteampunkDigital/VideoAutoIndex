@@ -6,9 +6,10 @@ import json
 import argparse
 import subprocess
 import platform
+import shutil
 from pathlib import Path
 from .video_processor import VideoProcessor
-from .key_moments import KeyMomentsExtractor
+from .key_moments import KeyMomentsExtractor, DEFAULT_OPENAI_MODEL, DEFAULT_ANTHROPIC_MODEL
 from .web_generator import WebGenerator
 
 WHISPER_DEVICE_BY_PLATFORM = {
@@ -69,39 +70,18 @@ def check_python_dependencies():
         missing_package = str(e).split("'")[1]
         print(f"Error: Required Python package '{missing_package}' is not installed")
         print("\nTo install required packages:")
-        print("pip install -r requirements.txt")
+        print("pip install -e .")
         return False
 
-def check_api_key():
-    """Check if the default Anthropic API key is available."""
-    if os.environ.get('ANTHROPIC_API_KEY'):
-        return True
-    print("Error: ANTHROPIC_API_KEY environment variable is not set")
-    return False
-
-def get_api_config(args):
-    """Determine API provider and key from command line args and environment."""
-    if getattr(args, "apple", False):
-        return "apple", None
-    if args.anthropic is not None:  # --anthropic was used
-        provider = "anthropic"
-        key = args.anthropic if args.anthropic else os.environ.get('ANTHROPIC_API_KEY')
-        if not key:
-            print("Error: Anthropic API key required")
-            print("Provide via --anthropic [key] or set ANTHROPIC_API_KEY environment variable")
-            return None, None
-    elif args.openai is not None:  # --openai was used
-        provider = "openai"
-        key = args.openai if args.openai else os.environ.get('OPENAI_API_KEY')
-        if not key:
-            print("Error: OpenAI API key required")
-            print("Provide via --openai [key] or set OPENAI_API_KEY environment variable")
-            return None, None
-    else:
-        print("Error: Must specify --anthropic, --openai, or --apple")
-        return None, None
-    
-    return provider, key
+def api_key_for_provider(provider):
+    """Resolve credentials for one stage, independently of the other stage."""
+    variable = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}.get(provider)
+    if variable is None:
+        return None
+    key = os.environ.get(variable)
+    if not key:
+        raise ValueError(f"{variable} is required for {provider}")
+    return key
 
 def whisper_language_for_transcription_language(transcription_language: str) -> str:
     """Return the Whisper language code for a supported transcription language."""
@@ -116,6 +96,8 @@ def create_transcriber(
     transcriber_name: str = "whisper",
     device_id: str = None,
     transcription_language: str = "en",
+    api_key: str = None,
+    model_name: str = None,
 ):
     """Create the configured audio transcriber."""
     if transcriber_name == "whisper":
@@ -125,8 +107,11 @@ def create_transcriber(
             audio_path,
             device_id=device_id or default_whisper_device_id(),
             language=whisper_language_for_transcription_language(transcription_language),
+            **({"model_name": model_name} if model_name else {}),
         )
-    if transcriber_name == "apple_speech":
+    if transcriber_name in ("apple", "apple_speech"):
+        if model_name:
+            raise ValueError("Apple transcription does not support a model override")
         from .transcriber_apple_speech import AppleSpeechTranscriber
 
         compare_locale = "en-US" if transcription_language == "ja" else None
@@ -135,18 +120,22 @@ def create_transcriber(
             locale=apple_locale_for_transcription_language(transcription_language),
             compare_locale=compare_locale,
         )
-    raise ValueError("transcriber_name must be 'whisper' or 'apple_speech'")
+    if transcriber_name == "openai":
+        from .transcriber_openai import OpenAITranscriber, DEFAULT_TRANSCRIPTION_MODEL
 
-def transcriber_for_provider(api_provider: str):
-    """Map the selected running mode to its transcription backend."""
-    if api_provider == "apple":
-        return "apple_speech"
-    if api_provider in ("openai", "anthropic"):
-        return "whisper"
-    raise ValueError("api_provider must be 'anthropic', 'openai', or 'apple'")
+        return OpenAITranscriber(audio_path, api_key=api_key,
+                                 model_name=model_name or DEFAULT_TRANSCRIPTION_MODEL,
+                                 language=transcription_language)
+    if transcriber_name == "speechcpp":
+        from .transcriber_speechcpp import SpeechCppTranscriber
+
+        return SpeechCppTranscriber(audio_path, model_name=model_name, language=transcription_language)
+    raise ValueError("transcriber_name must be 'whisper', 'apple', 'openai', or 'speechcpp'")
 
 def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None,
-                 api_provider: str = None, api_key: str = None, transcription_language: str = "en"):
+                 api_provider: str = None, api_key: str = None, transcription_language: str = "en",
+                 transcriber_name: str = "whisper", transcribe_api_key: str = None,
+                 transcribe_model: str = None, summarize_model: str = None):
     """
     Main processing pipeline for video indexing.
     
@@ -155,13 +144,12 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         output_dir: Directory to store intermediate files
         device_id: Device ID for Whisper inference ("0" for CPU/CUDA, "mps" for Darwin)
         skip_to: Stage to skip to ('transcribe', 'analyze', or 'generate')
-        api_provider: Running mode. Apple uses Apple Speech; OpenAI/Anthropic use Whisper.
+        api_provider: Provider for summarization, independent of transcription.
         transcription_language: Native transcription language ("en" or "ja")
     """
     os.makedirs(output_dir, exist_ok=True)
     print("\nProcessing video...")
     api_provider = api_provider or "anthropic"
-    transcriber_name = transcriber_for_provider(api_provider)
     
     audio_path = os.path.join(output_dir, f"{Path(video_path).stem}_audio.wav")
     transcript_path = os.path.join(output_dir, "audio_transcript.json")
@@ -184,6 +172,8 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
             transcriber_name,
             device_id,
             transcription_language,
+            api_key=transcribe_api_key,
+            model_name=transcribe_model,
         )
         transcriber.transcribe(transcript_path, subtitle_path)
     
@@ -194,7 +184,8 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
             raise FileNotFoundError(f"Subtitle file not found: {subtitle_path}")
         
         try:
-            key_extractor = KeyMomentsExtractor(subtitle_path, api_provider=api_provider, api_key=api_key)
+            key_extractor = KeyMomentsExtractor(subtitle_path, api_provider=api_provider, api_key=api_key,
+                                               model_name=summarize_model)
             analysis = key_extractor.extract_key_moments()
         except Exception as e:
             print(f"\nError during content analysis: {str(e)}")
@@ -215,7 +206,7 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
             sys.exit(1)
         
         # Save analysis to a JSON file
-        with open(analysis_path, "w") as f:
+        with open(analysis_path, "w", encoding="utf-8") as f:
             json.dump(analysis, f, indent=2)
         print(f"   Analysis saved to: {analysis_path}")
     
@@ -232,8 +223,8 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
         
         webpage_path = os.path.join(video_dir, f"{video_name}_summary.html")
-        with open(output_webpage_path, 'r') as src, open(webpage_path, 'w') as dst:
-            dst.write(src.read())
+        if Path(output_webpage_path).resolve() != Path(webpage_path).resolve():
+            shutil.copyfile(output_webpage_path, webpage_path)
         
         print(f"   Webpage saved to:")
         print(f"   {webpage_path}")
@@ -241,7 +232,7 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
     print("\nProcessing complete!")
     print(f"\nOpen {webpage_path} in your browser to view the meeting summary.")
 
-def main():
+def build_parser():
     parser = argparse.ArgumentParser(description="Process a video file to extract key moments and takeaways")
     parser.add_argument("video_path", help="Path to the input video file")
     parser.add_argument("--output-dir", default="output", help="Directory to store intermediate files")
@@ -251,35 +242,62 @@ def main():
     parser.add_argument("--skipto", choices=['transcribe', 'analyze', 'generate'], dest="skip_to",
                        help="Skip to a specific stage (transcribe, analyze, or generate)")
     
-    # API provider selection - mutually exclusive
-    api_group = parser.add_mutually_exclusive_group(required=True)
-    api_group.add_argument("--anthropic", nargs='?', const='', 
-                          help="Use Anthropic Claude (optional key, falls back to ANTHROPIC_API_KEY env var)")
-    api_group.add_argument("--openai", nargs='?', const='',
-                          help="Use OpenAI GPT (optional key, falls back to OPENAI_API_KEY env var)")
-    api_group.add_argument("--apple", action="store_true",
-                          help="Use Apple Foundation Models on this Mac (no API key required)")
-    
-    args = parser.parse_args()
+    parser.add_argument("--transcribe", choices=["whisper", "apple", "openai", "speechcpp"], default="whisper",
+                        help="Speech recognition provider (default: whisper)")
+    parser.add_argument("--summarize", choices=["anthropic", "apple", "openai"],
+                        help="Provider for topics, key moments, and takeaways (required unless --skipto generate)")
+    parser.add_argument("--transcribe-model", help="Transcription model override (Whisper, OpenAI, or speech.cpp)")
+    parser.add_argument("--summarize-model", help="Summarization model override (Anthropic or OpenAI)")
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
     load_env_file()
-    
-    # Check basic dependencies first
-    if not all([check_ffmpeg(), check_python_dependencies()]):
+    transcribing = args.skip_to in (None, "transcribe")
+    summarizing = args.skip_to != "generate"
+    transcribe_key = summarize_key = None
+    try:
+        if transcribing:
+            if args.transcribe == "apple" and args.transcribe_model:
+                raise ValueError("--transcribe-model is not supported with --transcribe apple")
+            if args.transcribe == "openai":
+                from .transcriber_openai import validate_model, DEFAULT_TRANSCRIPTION_MODEL
+                validate_model(args.transcribe_model or DEFAULT_TRANSCRIPTION_MODEL)
+            if args.transcribe == "speechcpp":
+                from .transcriber_speechcpp import validate_model, DEFAULT_MODELS
+                validate_model(args.transcribe_model or DEFAULT_MODELS[args.transcription_language],
+                               args.transcription_language)
+            transcribe_key = api_key_for_provider(args.transcribe)
+        if summarizing:
+            if not args.summarize:
+                raise ValueError("--summarize is required unless --skipto generate is used")
+            if args.summarize == "apple" and args.summarize_model:
+                raise ValueError("--summarize-model is not supported with --summarize apple")
+            summarize_key = api_key_for_provider(args.summarize)
+    except ValueError as error:
+        parser.error(str(error))
+
+    if not check_python_dependencies() or (transcribing and not check_ffmpeg()):
         sys.exit(1)
-    
-    # Get API configuration
-    api_provider, api_key = get_api_config(args)
-    if not api_provider:
-        sys.exit(1)
-    
+    if transcribing:
+        defaults = {"whisper": "openai/whisper-large-v3-turbo", "apple": "SpeechTranscriber",
+                    "openai": "gpt-4o-transcribe-diarize"}
+        if args.transcribe == "speechcpp":
+            from .transcriber_speechcpp import DEFAULT_MODELS
+            defaults["speechcpp"] = DEFAULT_MODELS[args.transcription_language]
+        print(f"Transcription: {args.transcribe} / {args.transcribe_model or defaults[args.transcribe]}")
+    if summarizing:
+        defaults = {"anthropic": DEFAULT_ANTHROPIC_MODEL, "openai": DEFAULT_OPENAI_MODEL,
+                    "apple": "Foundation Models (automatic)"}
+        print(f"Summarization: {args.summarize} / {args.summarize_model or defaults[args.summarize]}")
     process_video(
-        args.video_path,
-        args.output_dir,
-        args.device_id,
-        args.skip_to,
-        api_provider,
-        api_key,
-        args.transcription_language,
+        args.video_path, args.output_dir, args.device_id, args.skip_to,
+        api_provider=args.summarize, api_key=summarize_key,
+        transcription_language=args.transcription_language,
+        transcriber_name=args.transcribe, transcribe_api_key=transcribe_key,
+        transcribe_model=args.transcribe_model, summarize_model=args.summarize_model,
     )
 
 if __name__ == "__main__":
