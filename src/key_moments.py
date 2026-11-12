@@ -11,7 +11,7 @@ from openai import OpenAI
 import openai
 import anthropic
 
-DEFAULT_OPENAI_MODEL = "gpt-5.6-terra"
+DEFAULT_OPENAI_MODEL = "gpt-6.1-terra"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-1-20250805"
 MINIMUM_MACOS_SDK = (26, 0)
 MACOS_SDK_ROOTS = [
