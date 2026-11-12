@@ -31,7 +31,7 @@ def test_speaker_metadata_escaping_legacy_and_invalid_chunks(tmp_path):
     ])
     rows = soup.select(".transcript-chunk")
     assert len(rows) == 4
-    assert all(row.name == "button" for row in rows)
+    assert all(row.name == "div" and row.select_one('button.transcript-timestamp') for row in rows)
     assert rows[0]["data-speaker"] == 'A"<b>'
     assert rows[0].select_one(".speaker-label").text == 'A"<b>'
     assert rows[0].find("script") is None and rows[0].find("b") is None
@@ -55,7 +55,7 @@ def test_actual_generated_javascript_highlights_all_active_rows(tmp_path):
             for row in soup.select(".transcript-chunk")]
     result = subprocess.run(
         ["node", str(Path(__file__).with_name("transcript_playback.cjs"))],
-        input=json.dumps({"script": soup.script.string, "rows": rows}),
+        input=json.dumps({"script": soup.select_one('script:not([type])').string, "rows": rows}),
         text=True, capture_output=True, check=True,
     )
     assert "passed" in result.stdout

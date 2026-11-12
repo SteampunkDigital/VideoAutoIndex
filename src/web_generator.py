@@ -2,6 +2,7 @@
 import os
 import json
 import mimetypes
+import hashlib
 from pathlib import Path
 from flask import Flask, render_template_string
 from typing import Dict, List
@@ -22,6 +23,7 @@ class WebGenerator:
         self.analysis_path = Path(analysis_path)
         self.video_path = Path(video_path)
         self.transcript_path = Path(transcript_path) if transcript_path else None
+        self.transcript_source = {'media_file': self.video_path.name}
         
         if not self.analysis_path.exists():
             raise FileNotFoundError(f"Analysis file not found: {analysis_path}")
@@ -72,8 +74,14 @@ class WebGenerator:
         Returns:
             List of transcript chunks with timing and text
         """
-        with open(self.transcript_path, 'r', encoding='utf-8') as f:
-            transcript_data = json.load(f)
+        transcript_bytes = self.transcript_path.read_bytes()
+        transcript_data = json.loads(transcript_bytes)
+        metadata = transcript_data.get('metadata', {})
+        self.transcript_source = {
+            'media_file': self.video_path.name,
+            'transcript_sha256': hashlib.sha256(transcript_bytes).hexdigest(),
+            'backend': metadata.get('backend'), 'model': metadata.get('model'),
+        }
         
         # Extract chunks and format for web display
         chunks = []
@@ -225,7 +233,6 @@ class WebGenerator:
                     padding: 8px 12px;
                     background: white;
                     border-radius: 4px;
-                    cursor: pointer;
                     transition: background-color 0.2s;
                 }
                 .transcript-chunk:hover {
@@ -244,6 +251,69 @@ class WebGenerator:
                     font-weight: 700;
                     margin-right: 8px;
                 }
+                .speaker-chip {
+                    display: inline-block;
+                    padding: 1px 8px;
+                    border: 1px solid var(--speaker-color, #64748b);
+                    border-radius: 999px;
+                    background: #f8fafc;
+                    cursor: text;
+                }
+                .speaker-chip:focus, .phrase-text:focus {
+                    outline: 2px solid #2563eb;
+                    outline-offset: 2px;
+                }
+                [contenteditable="plaintext-only"] {
+                    background: #fff;
+                    color: #111;
+                    cursor: text;
+                }
+                .phrase-text {
+                    white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                    cursor: text;
+                }
+                .phrase-text.corrected {
+                    text-decoration: underline dotted #92400e;
+                    text-underline-offset: 4px;
+                }
+                .transcript-toolbar {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 14px 0;
+                }
+                .transcript-toolbar button, .feedback-copy {
+                    font: inherit;
+                    padding: 6px 10px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    background: white;
+                    cursor: pointer;
+                }
+                .editing-help, .copy-status {
+                    color: #475569;
+                    font-size: 0.9em;
+                }
+                .correction-feedback {
+                    margin-top: 28px;
+                    padding-top: 12px;
+                    border-top: 1px solid #cbd5e1;
+                }
+                #corrections-json {
+                    display: block;
+                    box-sizing: border-box;
+                    width: 100%;
+                    margin: 12px 0;
+                    padding: 12px;
+                    font: 0.85rem/1.5 monospace;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    background: #fff;
+                    color: #172033;
+                    resize: vertical;
+                }
                 .overlap-status {
                     color: #713f12;
                     font-weight: 600;
@@ -253,6 +323,10 @@ class WebGenerator:
                     color: #666;
                     font-size: 0.9em;
                     margin-right: 10px;
+                    border: 0;
+                    padding: 2px 4px;
+                    background: #f1f5f9;
+                    cursor: pointer;
                 }
                 .transcript-chunk.active .transcript-timestamp {
                     color: #374151;
@@ -323,20 +397,33 @@ class WebGenerator:
             {% if transcript %}
             <div class="transcript-section">
                 <h2>Full Transcript</h2>
+                <p class="editing-help">Click a speaker chip to rename that speaker everywhere.
+                    Double-click phrase text to edit it, or focus it and press Enter.
+                    Select words and type a correction. Enter finishes; Escape cancels.
+                    Edits last until this page is reloaded.</p>
+                <div class="transcript-toolbar">
+                    <button type="button" id="copy-transcript">Copy transcript</button>
+                    <button type="button" id="copy-selected-phrases">Copy selected phrases</button>
+                    <span id="copy-status" class="copy-status" role="status" aria-live="polite"></span>
+                </div>
                 <p id="overlap-status" class="overlap-status" role="status" hidden>Simultaneous speech</p>
                 <div class="transcript">
                     {% for chunk in transcript %}
-                    <button type="button" class="transcript-chunk"
+                    <div class="transcript-chunk"
+                         data-editor-index="{{ loop.index0 }}"
                          data-segment-id="{{ chunk.id }}"
                          data-speaker="{{ chunk.speaker or '' }}"
                          style="--speaker-color: {{ chunk.speaker_color }}"
                          data-start="{{ chunk.start_seconds }}" 
-                         data-end="{{ chunk.end_seconds }}"
-                         onclick="seekToTime({{ chunk.start_seconds }})">
-                        <span class="transcript-timestamp">{{ chunk.start_time_formatted }} – {{ chunk.end_time_formatted }}</span>
-                        {% if chunk.speaker_label %}<span class="speaker-label">{{ chunk.speaker_label }}</span>{% endif %}
-                        {{ chunk.text }}
-                    </button>
+                         data-end="{{ chunk.end_seconds }}">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at {{ chunk.start_time_formatted }}"
+                                onclick="seekToTime({{ chunk.start_seconds }})">{{ chunk.start_time_formatted }} – {{ chunk.end_time_formatted }}</button>
+                        {% if chunk.speaker_label %}<span class="speaker-label{% if chunk.speaker %} speaker-chip{% endif %}"
+                            {% if chunk.speaker %}role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename {{ chunk.speaker_label }}" data-speaker-id="{{ chunk.speaker }}"{% endif %}>{{ chunk.speaker_label }}</span>{% endif %}
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at {{ chunk.start_time_formatted }}">{{ chunk.text }}</span>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -358,6 +445,20 @@ class WebGenerator:
                     {% endif %}
                 </aside>
             </div>
+
+            {% if transcript %}
+            <section class="correction-feedback" aria-labelledby="correction-feedback-heading">
+                <h2 id="correction-feedback-heading">Transcript correction JSON</h2>
+                <p class="editing-help">Speaker names and corrected phrases update here as you edit.
+                    Copy this feedback for a targeted rerun. Original text and timestamps identify each region.</p>
+                <button type="button" id="copy-corrections-json" class="feedback-copy">Copy correction JSON</button>
+                <span id="json-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+                <label for="corrections-json" class="editing-help">Copyable feedback JSON</label>
+                <textarea id="corrections-json" rows="14" readonly spellcheck="false"></textarea>
+                <p id="feedback-status" class="editing-help" role="status" aria-live="polite"></p>
+            </section>
+            <script type="application/json" id="transcript-editor-data">{{ editor_data|tojson }}</script>
+            {% endif %}
 
             <script>
                 function seekVideo(timestamp) {
@@ -450,6 +551,7 @@ class WebGenerator:
                         updateTranscriptHighlight();
                     }
                 });
+                {{ editor_script|safe }}
             </script>
         </body>
         </html>
@@ -464,5 +566,14 @@ class WebGenerator:
                 video_rel_path=video_rel_path,
                 transcript=transcript,
                 media_type=mimetypes.guess_type(str(self.video_path))[0] or 'video/mp4',
-                audio_only=(mimetypes.guess_type(str(self.video_path))[0] or '').startswith('audio/')
+                audio_only=(mimetypes.guess_type(str(self.video_path))[0] or '').startswith('audio/'),
+                editor_data={
+                    'source': self.transcript_source,
+                    'phrases': [{
+                        'segment_id': c['id'], 'start_seconds': c['start_seconds'],
+                        'end_seconds': c['end_seconds'], 'speaker_id': c.get('speaker'),
+                        'text': c['text'], 'start_time': c['start_time_formatted'],
+                    } for c in (transcript or [])],
+                },
+                editor_script=Path(__file__).with_name('transcript_editor.js').read_text(encoding='utf-8'),
             )

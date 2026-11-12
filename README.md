@@ -221,6 +221,34 @@ Transcript text is never duplicated to manufacture a second speaker's words.
 Recognized phrase attribution and recovery of both voices during cross-talk still
 need listening review before using this backend for full meetings.
 
+## Transcript review and correction feedback
+
+Generated pages support edits for the current page session:
+
+- Click a speaker chip and type a name. Every phrase with that stable speaker ID
+  updates together. Enter finishes; Escape cancels the current edit.
+- Double-click phrase text to edit a word or range, or focus the phrase and press
+  Enter to select the entire phrase. Enter finishes; Escape cancels.
+- Click a timestamp to play that phrase. Selecting or editing text does not seek.
+- Select text across phrases and use **Copy selected phrases** to copy complete
+  selected phrases with their current speaker names and timestamps. **Copy
+  transcript** copies the whole transcript; normal browser text selection and
+  copying also remain available.
+
+The **Transcript correction JSON** block at the bottom updates as edits are made.
+It includes the media filename, source transcript SHA-256, model metadata, stable
+speaker IDs with display names, and changed regions. Each changed region retains
+its original segment ID, start/end seconds, original text, corrected text, and a
+word-replacement hint scoped to that region. Restoring the original text removes
+that region from the export. Unknown voices retain a null speaker ID.
+
+Edits are kept in memory only; reload resets them. Use **Copy correction JSON**
+before leaving the page to retain the feedback. The HTML embeds its editor script
+and requires no server or browser storage. The export is a feedback contract for
+subsequent targeted experiments; automatic JSON import/retranscription is a
+separate phase. A consumer should validate the source hash and original region
+anchors, and keep hints scoped to the corrected regions.
+
 ## Output Format
 
 The analysis JSON follows this structure:
@@ -285,6 +313,15 @@ pytest -v -m "integration"
 
 Playback behavior tests execute the generated JavaScript using Node.js when it is
 available. OpenAI backend tests mock API responses and do not require a live key.
+The optional `tests/transcript_editor_browser.cjs` check uses Playwright with an
+installed Chrome to exercise actual editing, copy behavior, overlap highlighting,
+and reload reset. It generates its own short fixture. For example, from the
+activated Python environment:
+
+```bash
+npm install --prefix /tmp/videoautoindex-ui-tests playwright
+NODE_PATH=/tmp/videoautoindex-ui-tests/node_modules PYTHON=python node tests/transcript_editor_browser.cjs
+```
 
 ### Test Structure
 
