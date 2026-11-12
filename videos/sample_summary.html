@@ -9,19 +9,41 @@
                 body {
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                     line-height: 1.6;
-                    max-width: 1200px;
+                    max-width: 1280px;
                     margin: 0 auto;
                     padding: 20px;
                     color: #333;
                 }
-                .video-container {
-                    margin: 20px 0;
+                .page-layout {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) minmax(260px, 380px);
+                    grid-template-areas: "content video";
+                    gap: 28px;
+                    align-items: start;
                 }
-                video {
-                    max-width: 100%;
+                .content-column {
+                    grid-area: content;
+                    min-width: 0;
+                }
+                .video-container {
+                    grid-area: video;
+                    position: sticky;
+                    top: 20px;
+                    margin: 0;
+                    padding: 14px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                }
+                video, audio {
+                    display: block;
+                    width: 100%;
+                    max-height: calc(100vh - 68px);
+                    background: #111;
+                    border-radius: 6px;
                 }
                 .topic {
-                    margin: 40px 0;
+                    margin: 0 0 28px;
                     padding: 20px;
                     background: #f8f9fa;
                     border-radius: 8px;
@@ -63,78 +85,508 @@
                     color: #34495e;
                     margin: 20px 0 10px;
                 }
+                .transcript-section {
+                    margin: 0;
+                    padding: 20px;
+                    background: #f8f9fa;
+                    border-radius: 8px;
+                }
+                .transcript-chunk {
+                    display: block;
+                    width: 100%;
+                    text-align: left;
+                    font: inherit;
+                    color: inherit;
+                    border: 1px solid #e5e7eb;
+                    border-left: 4px solid var(--speaker-color, #64748b);
+                    margin: 5px 0;
+                    padding: 8px 12px;
+                    background: white;
+                    border-radius: 4px;
+                    transition: background-color 0.2s;
+                }
+                .transcript-chunk:hover {
+                    background: #e3f2fd;
+                }
+                .transcript-chunk.active {
+                    background: #dbeafe;
+                    outline: 2px solid var(--speaker-color, #64748b);
+                    outline-offset: -2px;
+                }
+                .transcript-chunk.overlapping {
+                    background: #fef3c7;
+                }
+                .speaker-label {
+                    color: var(--speaker-color, #64748b);
+                    font-weight: 700;
+                    margin-right: 8px;
+                }
+                .speaker-chip {
+                    display: inline-block;
+                    padding: 1px 8px;
+                    border: 1px solid var(--speaker-color, #64748b);
+                    border-radius: 999px;
+                    background: #f8fafc;
+                    cursor: text;
+                }
+                .speaker-chip:focus, .phrase-text:focus {
+                    outline: 2px solid #2563eb;
+                    outline-offset: 2px;
+                }
+                [contenteditable="plaintext-only"] {
+                    background: #fff;
+                    color: #111;
+                    cursor: text;
+                }
+                .phrase-text {
+                    white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                    cursor: text;
+                }
+                .phrase-text.corrected {
+                    text-decoration: underline dotted #92400e;
+                    text-underline-offset: 4px;
+                }
+                .transcript-toolbar {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 8px;
+                    margin: 14px 0;
+                }
+                .transcript-toolbar button, .feedback-copy {
+                    font: inherit;
+                    padding: 6px 10px;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    background: white;
+                    cursor: pointer;
+                }
+                .editing-help, .copy-status {
+                    color: #475569;
+                    font-size: 0.9em;
+                }
+                .correction-feedback {
+                    margin-top: 28px;
+                    padding-top: 12px;
+                    border-top: 1px solid #cbd5e1;
+                }
+                #corrections-json {
+                    display: block;
+                    box-sizing: border-box;
+                    width: 100%;
+                    margin: 12px 0;
+                    padding: 12px;
+                    font: 0.85rem/1.5 monospace;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    background: #fff;
+                    color: #172033;
+                    resize: vertical;
+                }
+                .overlap-status {
+                    color: #713f12;
+                    font-weight: 600;
+                }
+                .transcript-timestamp {
+                    font-family: monospace;
+                    color: #666;
+                    font-size: 0.9em;
+                    margin-right: 10px;
+                    border: 0;
+                    padding: 2px 4px;
+                    background: #f1f5f9;
+                    cursor: pointer;
+                }
+                .transcript-chunk.active .transcript-timestamp {
+                    color: #374151;
+                }
+                @media (max-width: 860px) {
+                    body {
+                        padding: 14px;
+                    }
+                    .page-layout {
+                        grid-template-columns: 1fr;
+                        grid-template-areas:
+                            "video"
+                            "content";
+                        gap: 24px;
+                    }
+                    .video-container {
+                        position: static;
+                    }
+                    video {
+                        width: auto;
+                        max-width: 100%;
+                        height: min(50vh, 520px);
+                        max-height: 520px;
+                        margin: 0 auto;
+                    }
+                }
             </style>
         </head>
         <body>
             <h1>Meeting Summary</h1>
-            
-            <div class="video-container">
-                <video id="meeting-video" controls>
-                    <source src="sample.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-            </div>
 
+            <div class="page-layout">
+                <main class="content-column">
             <div class="topics">
-                
+
                 <div class="topic">
                     <h2>
-                        AI Image Generation Demo with Sushi Example
-                        <span class="timestamp" onclick="seekVideo('00:00:00,000')">
-                            00:00:00,000
+                        Comparing the sushi scan with the real dish
+                        <span class="timestamp" onclick="seekVideo('00:00:01,219')">
+                            00:00:01,219
                         </span>
                     </h2>
 
                     <div class="key-moments">
                         <h3>Key Moments</h3>
-                        
+
                         <div class="key-moment">
-                            Initial presentation of AI-generated sushi image
-                            <span class="timestamp" onclick="seekVideo('00:00:00,000')">
-                                00:00:00,000
+                            The sushi is presented and compared with the real dinner; chopsticks are noted as a giveaway.
+                            <span class="timestamp" onclick="seekVideo('00:00:02,094')">
+                                00:00:02,094
                             </span>
                         </div>
-                        
+
                         <div class="key-moment">
-                            Comparison with real sushi photo revealed by chopsticks detail
-                            <span class="timestamp" onclick="seekVideo('00:00:07,260')">
-                                00:00:07,260
+                            Both speakers agree that the first representation looks convincing without the real dish for comparison.
+                            <span class="timestamp" onclick="seekVideo('00:00:23,546')">
+                                00:00:23,546
                             </span>
                         </div>
-                        
-                        <div class="key-moment">
-                            Discussion of AI image generation speed and accessibility
-                            <span class="timestamp" onclick="seekVideo('00:00:27,800')">
-                                00:00:27,800
-                            </span>
-                        </div>
-                        
+
                     </div>
 
                     <div class="takeaways">
                         <h3>Key Takeaways</h3>
-                        
+
                         <div class="takeaway">
-                            AI-generated images can be convincingly realistic at first glance
+                            The sushi representation appears convincing when viewed on its own.
                         </div>
-                        
-                        <div class="takeaway">
-                            Real photos can be distinguished by specific details (like chopsticks interaction)
-                        </div>
-                        
-                        <div class="takeaway">
-                            AI image generation process is nearly instantaneous and mobile-friendly
-                        </div>
-                        
+
                     </div>
                 </div>
-                
+
+                <div class="topic">
+                    <h2>
+                        Speed and accessibility of scanning
+                        <span class="timestamp" onclick="seekVideo('00:00:25,998')">
+                            00:00:25,998
+                        </span>
+                    </h2>
+
+                    <div class="key-moments">
+                        <h3>Key Moments</h3>
+
+                        <div class="key-moment">
+                            The narrator emphasizes that the process takes almost no time.
+                            <span class="timestamp" onclick="seekVideo('00:00:30,002')">
+                                00:00:30,002
+                            </span>
+                        </div>
+
+                        <div class="key-moment">
+                            A scan is built instantly and can be viewed and manipulated on a phone.
+                            <span class="timestamp" onclick="seekVideo('00:00:35,042')">
+                                00:00:35,042
+                            </span>
+                        </div>
+
+                    </div>
+
+                    <div class="takeaways">
+                        <h3>Key Takeaways</h3>
+
+                        <div class="takeaway">
+                            Scanning can quickly produce an interactive representation on a phone.
+                        </div>
+
+                    </div>
+                </div>
+
             </div>
+
+
+            <div class="transcript-section">
+                <h2>Full Transcript</h2>
+                <p class="editing-help">Click a speaker chip to rename that speaker everywhere.
+                    Double-click phrase text to edit it, or focus it and press Enter.
+                    Select words and type a correction. Enter finishes; Escape cancels.
+                    Edits last until this page is reloaded.</p>
+                <div class="transcript-toolbar">
+                    <button type="button" id="copy-transcript">Copy transcript</button>
+                    <button type="button" id="copy-selected-phrases">Copy selected phrases</button>
+                    <span id="copy-status" class="copy-status" role="status" aria-live="polite"></span>
+                </div>
+                <p id="overlap-status" class="overlap-status" role="status" hidden>Simultaneous speech</p>
+                <div class="transcript">
+
+                    <div class="transcript-chunk"
+                         data-editor-index="0"
+                         data-segment-id="phrase-0"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="1.2189999999999999"
+                         data-end="2.0940000000000003">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:01,219"
+                                onclick="seekToTime(1.2189999999999999)">00:00:01,219 – 00:00:02,094</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:01,219">Yes, here it is.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="1"
+                         data-segment-id="phrase-1"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="2.0940000000000003"
+                         data-end="4.879">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:02,094"
+                                onclick="seekToTime(2.0940000000000003)">00:00:02,094 – 00:00:04,879</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:02,094">So this is the sushi.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="2"
+                         data-segment-id="phrase-2"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="4.879"
+                         data-end="7.390000000000001">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:04,879"
+                                onclick="seekToTime(4.879)">00:00:04,879 – 00:00:07,390</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:04,879">Now, can you tell just by looking at this, is that?</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="3"
+                         data-segment-id="phrase-3"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="7.894"
+                         data-end="9.324">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:07,894"
+                                onclick="seekToTime(7.894)">00:00:07,894 – 00:00:09,324</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:07,894">The real dinner is this.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="4"
+                         data-segment-id="phrase-4"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="9.504"
+                         data-end="14.038">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:09,504"
+                                onclick="seekToTime(9.504)">00:00:09,504 – 00:00:14,038</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:09,504">Oh yeah, there&#39;s there&#39;s the giveaway, that&#39;s the chopsticks reaching in.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="5"
+                         data-segment-id="phrase-5"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="14.038"
+                         data-end="15.55">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:14,038"
+                                onclick="seekToTime(14.038)">00:00:14,038 – 00:00:15,550</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:14,038">No, I mean, there we go.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="6"
+                         data-segment-id="phrase-6"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="15.55"
+                         data-end="16.894">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:15,550"
+                                onclick="seekToTime(15.55)">00:00:15,550 – 00:00:16,894</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:15,550">There&#39;s the real sushi.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="7"
+                         data-segment-id="phrase-7"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="17.183999999999997"
+                         data-end="17.924">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:17,184"
+                                onclick="seekToTime(17.183999999999997)">00:00:17,184 – 00:00:17,924</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:17,184">So.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="8"
+                         data-segment-id="phrase-8"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="18.176"
+                         data-end="23.546">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:18,176"
+                                onclick="seekToTime(18.176)">00:00:18,176 – 00:00:23,546</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:18,176">Yeah, I, I mean, without seeing what the real stuff, the first one looks absolutely</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="9"
+                         data-segment-id="phrase-9"
+                         data-speaker="Speaker 2"
+                         style="--speaker-color: #9d174d"
+                         data-start="24.584"
+                         data-end="25.061">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:24,584"
+                                onclick="seekToTime(24.584)">00:00:24,584 – 00:00:25,061</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Aaron" data-speaker-id="Speaker 2">Aaron</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:24,584">Pretty convincing, yeah.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="10"
+                         data-segment-id="phrase-10"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="25.061"
+                         data-end="25.598">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:25,061"
+                                onclick="seekToTime(25.061)">00:00:25,061 – 00:00:25,598</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:25,061">Convincing, yes.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="11"
+                         data-segment-id="phrase-11"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="25.997999999999998"
+                         data-end="29.154">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:25,998"
+                                onclick="seekToTime(25.997999999999998)">00:00:25,998 – 00:00:29,154</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:25,998">So, yeah, I think this just really showcases</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="12"
+                         data-segment-id="phrase-12"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="30.002"
+                         data-end="33.952">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:30,002"
+                                onclick="seekToTime(30.002)">00:00:30,002 – 00:00:33,952</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:30,002">Right off the top, that it it takes almost no time at all.</span>
+                    </div>
+
+                    <div class="transcript-chunk"
+                         data-editor-index="13"
+                         data-segment-id="phrase-13"
+                         data-speaker="Speaker 1"
+                         style="--speaker-color: #1d4ed8"
+                         data-start="35.042"
+                         data-end="39.861999999999995">
+                        <button type="button" class="transcript-timestamp" aria-label="Play phrase at 00:00:35,042"
+                                onclick="seekToTime(35.042)">00:00:35,042 – 00:00:39,862</button>
+                        <span class="speaker-label speaker-chip"
+                            role="textbox" tabindex="0" aria-readonly="true"
+                            aria-label="Rename Narrator" data-speaker-id="Speaker 1">Narrator</span>
+                        <span class="phrase-text" tabindex="0" role="textbox" aria-readonly="true"
+                              aria-label="Edit phrase at 00:00:35,042">You take a scan of it, it builds it up instantly and you can see it and and play with it right on your phone.</span>
+                    </div>
+
+                </div>
+            </div>
+
+
+                </main>
+
+                <aside class="video-container">
+
+                    <video id="meeting-video" controls>
+                        <source src="sample.mp4" type="video/mp4">
+                        Your browser does not support video playback.
+                    </video>
+
+                </aside>
+            </div>
+
+
+            <section class="correction-feedback" aria-labelledby="correction-feedback-heading">
+                <h2 id="correction-feedback-heading">Transcript correction JSON</h2>
+                <p class="editing-help">Speaker names and corrected phrases update here as you edit.
+                    Copy this feedback for a targeted rerun. Original text and timestamps identify each region.</p>
+                <button type="button" id="copy-corrections-json" class="feedback-copy">Copy correction JSON</button>
+                <span id="json-copy-status" class="copy-status" role="status" aria-live="polite"></span>
+                <label for="corrections-json" class="editing-help">Copyable feedback JSON</label>
+                <textarea id="corrections-json" rows="14" readonly spellcheck="false"></textarea>
+                <p id="feedback-status" class="editing-help" role="status" aria-live="polite"></p>
+            </section>
+            <script type="application/json" id="transcript-editor-data">{"phrases": [{"end_seconds": 2.0940000000000003, "segment_id": "phrase-0", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 1.2189999999999999, "start_time": "00:00:01,219", "text": "Yes, here it is."}, {"end_seconds": 4.879, "segment_id": "phrase-1", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 2.0940000000000003, "start_time": "00:00:02,094", "text": "So this is the sushi."}, {"end_seconds": 7.390000000000001, "segment_id": "phrase-2", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 4.879, "start_time": "00:00:04,879", "text": "Now, can you tell just by looking at this, is that?"}, {"end_seconds": 9.324, "segment_id": "phrase-3", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 7.894, "start_time": "00:00:07,894", "text": "The real dinner is this."}, {"end_seconds": 14.038, "segment_id": "phrase-4", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 9.504, "start_time": "00:00:09,504", "text": "Oh yeah, there\u0027s there\u0027s the giveaway, that\u0027s the chopsticks reaching in."}, {"end_seconds": 15.55, "segment_id": "phrase-5", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 14.038, "start_time": "00:00:14,038", "text": "No, I mean, there we go."}, {"end_seconds": 16.894, "segment_id": "phrase-6", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 15.55, "start_time": "00:00:15,550", "text": "There\u0027s the real sushi."}, {"end_seconds": 17.924, "segment_id": "phrase-7", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 17.183999999999997, "start_time": "00:00:17,184", "text": "So."}, {"end_seconds": 23.546, "segment_id": "phrase-8", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 18.176, "start_time": "00:00:18,176", "text": "Yeah, I, I mean, without seeing what the real stuff, the first one looks absolutely"}, {"end_seconds": 25.061, "segment_id": "phrase-9", "speaker_id": "Speaker 2", "speaker_name": "Aaron", "start_seconds": 24.584, "start_time": "00:00:24,584", "text": "Pretty convincing, yeah."}, {"end_seconds": 25.598, "segment_id": "phrase-10", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 25.061, "start_time": "00:00:25,061", "text": "Convincing, yes."}, {"end_seconds": 29.154, "segment_id": "phrase-11", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 25.997999999999998, "start_time": "00:00:25,998", "text": "So, yeah, I think this just really showcases"}, {"end_seconds": 33.952, "segment_id": "phrase-12", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 30.002, "start_time": "00:00:30,002", "text": "Right off the top, that it it takes almost no time at all."}, {"end_seconds": 39.861999999999995, "segment_id": "phrase-13", "speaker_id": "Speaker 1", "speaker_name": "Narrator", "start_seconds": 35.042, "start_time": "00:00:35,042", "text": "You take a scan of it, it builds it up instantly and you can see it and and play with it right on your phone."}], "source": {"backend": "speechcpp", "media_file": "sample.mp4", "model": "nemotron-3.5-transcribe", "transcript_sha256": "f33c66737e5bef584b4e3de05255ba58cd821e39406232a2cd148bcecadb3728"}}</script>
+
 
             <script>
                 function seekVideo(timestamp) {
                     const video = document.getElementById('meeting-video');
                     const seconds = parseTimestamp(timestamp);
+                    video.currentTime = seconds;
+                    video.play();
+                }
+
+                function seekToTime(seconds) {
+                    const video = document.getElementById('meeting-video');
                     video.currentTime = seconds;
                     video.play();
                 }
@@ -145,7 +597,312 @@
                     const [hours, minutes, seconds] = time.split(':').map(Number);
                     return hours * 3600 + minutes * 60 + seconds + Number(ms) / 1000;
                 }
+
+                // Highlight current transcript segment during playback
+                let transcriptChunks = [];
+                let previousActiveChunks = new Set();
+                function updateTranscriptHighlight() {
+                    const video = document.getElementById('meeting-video');
+                    const currentTime = video.currentTime;
+                    const activeSpeakers = new Set();
+                    const activeChunks = new Set();
+                    transcriptChunks.forEach(({element, start, end, speaker}) => {
+                        if (currentTime >= start && currentTime < end) {
+                            activeChunks.add(element);
+                            if (speaker) activeSpeakers.add(speaker);
+                        }
+                    });
+                    // Only touch active or previously active DOM nodes, even on long recordings.
+                    previousActiveChunks.forEach(chunk => {
+                        if (!activeChunks.has(chunk)) {
+                            chunk.classList.remove('active');
+                            chunk.classList.remove('overlapping');
+                            chunk.removeAttribute('aria-current');
+                        }
+                    });
+                    const overlapping = activeSpeakers.size > 1;
+                    activeChunks.forEach(chunk => {
+                        if (!previousActiveChunks.has(chunk)) {
+                            chunk.classList.toggle('active', true);
+                            chunk.setAttribute('aria-current', 'true');
+                        }
+                        chunk.classList.toggle('overlapping', overlapping);
+                    });
+                    previousActiveChunks = activeChunks;
+                    const status = document.getElementById('overlap-status');
+                    if (status) status.hidden = !overlapping;
+                }
+
+
+                // Set up video event listeners
+                document.addEventListener('DOMContentLoaded', function() {
+                    const video = document.getElementById('meeting-video');
+                    if (video) {
+                        transcriptChunks = Array.from(document.querySelectorAll('.transcript-chunk')).map(element => ({
+                            element, start: parseFloat(element.dataset.start),
+                            end: parseFloat(element.dataset.end), speaker: element.dataset.speaker
+                        }));
+                        // Update transcript highlight as video plays
+                        video.addEventListener('timeupdate', updateTranscriptHighlight);
+
+                        // Also update on seeking
+                        video.addEventListener('seeked', updateTranscriptHighlight);
+                        video.addEventListener('seeking', updateTranscriptHighlight);
+                        video.addEventListener('loadedmetadata', updateTranscriptHighlight);
+                        // Short interjections can fall between timeupdate events.
+                        let frame = null;
+                        function tick() {
+                            updateTranscriptHighlight();
+                            frame = video.paused || video.ended ? null : requestAnimationFrame(tick);
+                        }
+                        video.addEventListener('play', function() {
+                            if (frame === null) tick();
+                        });
+                        function stopHighlightLoop() {
+                            if (frame !== null) cancelAnimationFrame(frame);
+                            frame = null;
+                            updateTranscriptHighlight();
+                        }
+                        video.addEventListener('pause', stopHighlightLoop);
+                        video.addEventListener('ended', stopHighlightLoop);
+                        updateTranscriptHighlight();
+                    }
+                });
+                // Session-only transcript editing. Stable diarization IDs and source text never change.
+(() => {
+    const dataElement = document.getElementById('transcript-editor-data');
+    if (!dataElement || !dataElement.textContent) return;
+    const initial = JSON.parse(dataElement.textContent);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const rows = Array.from(document.querySelectorAll('.transcript-chunk'));
+        const phrases = initial.phrases.map(phrase => ({...phrase, correctedText: phrase.text}));
+        const speakerNames = new Map();
+        phrases.forEach(phrase => {
+            if (phrase.speaker_id) speakerNames.set(phrase.speaker_id, phrase.speaker_name || phrase.speaker_id);
+        });
+        const snapshots = new WeakMap();
+        const exportBox = document.getElementById('corrections-json');
+        const feedbackStatus = document.getElementById('feedback-status');
+        const copyStatus = document.getElementById('copy-status');
+        const jsonCopyStatus = document.getElementById('json-copy-status');
+        const cleanText = value => value.replace(/\s+/gu, ' ').trim();
+
+        function wordHint(original, corrected) {
+            const before = original.match(/\S+/gu) || [];
+            const after = corrected.match(/\S+/gu) || [];
+            let prefix = 0;
+            while (prefix < before.length && prefix < after.length && before[prefix] === after[prefix]) prefix++;
+            let suffix = 0;
+            while (suffix < before.length - prefix && suffix < after.length - prefix &&
+                   before[before.length - suffix - 1] === after[after.length - suffix - 1]) suffix++;
+            return {
+                original: before.slice(prefix, before.length - suffix).join(' '),
+                replacement: after.slice(prefix, after.length - suffix).join(' ')
+            };
+        }
+
+        function updateExport() {
+            jsonCopyStatus.textContent = '';
+            const regions = phrases.filter(p => p.correctedText !== p.text).map(p => ({
+                segment_id: p.segment_id,
+                start_seconds: p.start_seconds,
+                end_seconds: p.end_seconds,
+                speaker_id: p.speaker_id,
+                speaker_name: p.speaker_id ? speakerNames.get(p.speaker_id) : null,
+                original_text: p.text,
+                corrected_text: p.correctedText,
+                word_hints: [wordHint(p.text, p.correctedText)]
+            }));
+            const speakers = Array.from(speakerNames, ([speaker_id, name]) => ({speaker_id, name}));
+            exportBox.value = JSON.stringify({
+                schema_version: 1,
+                type: 'video-auto-index.transcript-feedback',
+                source: initial.source,
+                speakers,
+                regions
+            }, null, 2);
+            const renamed = speakers.filter(s => s.name !== s.speaker_id).length;
+            feedbackStatus.textContent = `${renamed} renamed speakers; ${regions.length} corrected phrases. ` +
+                'Copy the JSON before reloading to keep your feedback.';
+        }
+
+        function updateSpeaker(speakerId, name, editingChip = null) {
+            speakerNames.set(speakerId, name);
+            document.querySelectorAll('.speaker-chip').forEach(chip => {
+                if (chip.dataset.speakerId === speakerId && chip !== editingChip) chip.textContent = name;
+            });
+            updateExport();
+        }
+
+        function synchronize(element, kind, index) {
+            const text = cleanText(element.textContent);
+            if (kind === 'speaker') {
+                const id = element.dataset.speakerId;
+                updateSpeaker(id, text.slice(0, 120) || id, element);
+            } else {
+                phrases[index].correctedText = text;
+                element.classList.toggle('corrected', text !== phrases[index].text);
+                updateExport();
+            }
+        }
+
+        function startEditing(element, selectAll) {
+            if (element.hasAttribute('contenteditable')) return;
+            const selection = window.getSelection();
+            const saved = [];
+            if (!selectAll && selection) {
+                for (let i = 0; i < selection.rangeCount; i++) {
+                    const range = selection.getRangeAt(i);
+                    if (element.contains(range.startContainer) && element.contains(range.endContainer)) {
+                        saved.push(range.cloneRange());
+                    }
+                }
+            }
+            snapshots.set(element, element.textContent);
+            element.setAttribute('contenteditable', 'plaintext-only');
+            element.setAttribute('aria-readonly', 'false');
+            element.focus({preventScroll: true});
+            if (selection) {
+                selection.removeAllRanges();
+                if (selectAll) {
+                    const range = document.createRange();
+                    range.selectNodeContents(element);
+                    selection.addRange(range);
+                } else saved.forEach(range => selection.addRange(range));
+            }
+        }
+
+        function finishEditing(element, kind, index, cancel = false) {
+            if (!element.hasAttribute('contenteditable')) return;
+            if (cancel) element.textContent = snapshots.get(element);
+            let text = cleanText(element.textContent);
+            if (kind === 'speaker') text = text.slice(0, 120) || element.dataset.speakerId;
+            element.textContent = text;
+            element.removeAttribute('contenteditable');
+            element.setAttribute('aria-readonly', 'true');
+            synchronize(element, kind, index);
+        }
+
+        function editable(element, kind, index) {
+            element.addEventListener('keydown', event => {
+                if (event.isComposing) return;
+                if (!element.hasAttribute('contenteditable')) {
+                    if (event.key === 'Enter' || event.key === 'F2') {
+                        event.preventDefault();
+                        startEditing(element, true);
+                    }
+                } else if (event.key === 'Enter' || event.key === 'Escape') {
+                    event.preventDefault();
+                    finishEditing(element, kind, index, event.key === 'Escape');
+                    element.blur();
+                }
+            });
+            element.addEventListener('input', () => synchronize(element, kind, index));
+            element.addEventListener('blur', () => finishEditing(element, kind, index));
+            element.addEventListener('paste', event => {
+                if (!element.hasAttribute('contenteditable')) return;
+                event.preventDefault();
+                const text = (event.clipboardData.getData('text/plain') || '').replace(/\s+/gu, ' ');
+                // insertText keeps browser undo behavior and never inserts clipboard HTML.
+                if (!document.execCommand('insertText', false, text)) {
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount) {
+                        const range = selection.getRangeAt(0);
+                        if (!element.contains(range.commonAncestorContainer)) return;
+                        range.deleteContents();
+                        const node = document.createTextNode(text);
+                        range.insertNode(node);
+                        range.setStartAfter(node);
+                        range.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                    }
+                }
+                synchronize(element, kind, index);
+            });
+        }
+
+        rows.forEach((row, index) => {
+            const phrase = row.querySelector('.phrase-text');
+            editable(phrase, 'phrase', index);
+            phrase.addEventListener('dblclick', () => startEditing(phrase, false));
+            const chip = row.querySelector('.speaker-chip');
+            if (chip) {
+                editable(chip, 'speaker', index);
+                chip.addEventListener('click', () => startEditing(chip, true));
+            }
+        });
+
+        function transcriptText(indices) {
+            return indices.map(index => {
+                const p = phrases[index];
+                const speaker = p.speaker_id ? speakerNames.get(p.speaker_id) : 'Unknown speaker';
+                return `[${p.start_time}] ${speaker}: ${p.correctedText}`;
+            }).join('\n');
+        }
+
+        async function copyText(text, message, status = copyStatus) {
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error('Clipboard unavailable');
+                await navigator.clipboard.writeText(text);
+            } catch (_) {
+                // File URLs and browsers with restricted clipboard access still support manual copying.
+                const previousFocus = document.activeElement;
+                const selection = window.getSelection();
+                const ranges = selection ? Array.from({length: selection.rangeCount}, (_, i) =>
+                    selection.getRangeAt(i).cloneRange()) : [];
+                const temporary = document.createElement('textarea');
+                temporary.value = text;
+                temporary.style.cssText = 'position:fixed;opacity:0;left:-9999px;top:0';
+                document.body.appendChild(temporary);
+                temporary.select();
+                let copied = false;
+                try { copied = document.execCommand('copy'); } catch (_) { /* Manual copy remains available. */ }
+                temporary.remove();
+                if (previousFocus && previousFocus.focus) previousFocus.focus({preventScroll: true});
+                if (selection) {
+                    selection.removeAllRanges();
+                    ranges.forEach(range => selection.addRange(range));
+                }
+                if (!copied) {
+                    status.textContent = 'Clipboard access is unavailable. Select text and copy with Ctrl/Cmd+C.';
+                    return;
+                }
+            }
+            status.textContent = message;
+        }
+
+        const copyAll = document.getElementById('copy-transcript');
+        const copySelected = document.getElementById('copy-selected-phrases');
+        [copyAll, copySelected].forEach(button => button.addEventListener('mousedown', event => event.preventDefault()));
+        copyAll.addEventListener('click', () => copyText(transcriptText(phrases.map((_, i) => i)), 'Transcript copied.'));
+        copySelected.addEventListener('click', () => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.rangeCount) {
+                copyStatus.textContent = 'Select transcript text first.';
+                return;
+            }
+            const indices = rows.flatMap((row, index) => {
+                for (let i = 0; i < selection.rangeCount; i++) {
+                    if (selection.getRangeAt(i).intersectsNode(row)) return [index];
+                }
+                return [];
+            });
+            if (!indices.length) {
+                copyStatus.textContent = 'Select transcript text first.';
+                return;
+            }
+            copyText(transcriptText(indices), `${indices.length} selected phrases copied.`);
+        });
+        document.getElementById('copy-corrections-json').addEventListener('click', () =>
+            copyText(exportBox.value, 'Correction JSON copied.', jsonCopyStatus));
+        exportBox.addEventListener('focus', () => exportBox.select());
+        updateExport();
+    });
+})();
+
             </script>
         </body>
         </html>
-        
+
