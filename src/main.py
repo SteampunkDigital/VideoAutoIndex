@@ -135,7 +135,7 @@ def create_transcriber(
 def process_video(video_path: str, output_dir: str = "output", device_id: str = None, skip_to: str = None,
                  api_provider: str = None, api_key: str = None, transcription_language: str = "en",
                  transcriber_name: str = "whisper", transcribe_api_key: str = None,
-                 transcribe_model: str = None, summarize_model: str = None):
+                 transcribe_model: str = None, summarize_model: str = None, feedback_path: str = None):
     """
     Main processing pipeline for video indexing.
     
@@ -155,6 +155,14 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
     transcript_path = os.path.join(output_dir, "audio_transcript.json")
     subtitle_path = os.path.join(output_dir, "audio_subtitles.srt")
     analysis_path = os.path.join(output_dir, "meeting_analysis.json")
+    if feedback_path:
+        if skip_to != 'analyze':
+            raise ValueError('--feedback requires --skipto analyze to use the existing transcript and refresh its summary')
+        from .transcript_feedback import import_feedback
+
+        transcript_path, subtitle_path = import_feedback(output_dir, feedback_path, Path(video_path).name)
+        analysis_path = os.path.join(output_dir, 'meeting_analysis.reviewed.json')
+        print('   Applied confirmed feedback to separate reviewed transcript/subtitle files')
 
     if not skip_to:
         # Extract audio from the video file
@@ -218,6 +226,8 @@ def process_video(video_path: str, output_dir: str = "output", device_id: str = 
         
         video_dir = os.path.dirname(video_path)
         video_name = os.path.splitext(os.path.basename(video_path))[0]
+        if feedback_path:
+            video_name += '_reviewed'
         
         web_generator = WebGenerator(analysis_path, video_path, transcript_path)
         output_webpage_path = web_generator.generate(output_dir, f"{video_name}_summary.html")
@@ -248,6 +258,7 @@ def build_parser():
                         help="Provider for topics, key moments, and takeaways (required unless --skipto generate)")
     parser.add_argument("--transcribe-model", help="Transcription model override (Whisper, OpenAI, or speech.cpp)")
     parser.add_argument("--summarize-model", help="Summarization model override (Anthropic or OpenAI)")
+    parser.add_argument('--feedback', help='Apply exported correction JSON to an existing transcript (requires --skipto analyze)')
     return parser
 
 
@@ -259,6 +270,8 @@ def main(argv=None):
     summarizing = args.skip_to != "generate"
     transcribe_key = summarize_key = None
     try:
+        if args.feedback and args.skip_to != 'analyze':
+            raise ValueError('--feedback requires --skipto analyze')
         if transcribing:
             if args.transcribe == "apple" and args.transcribe_model:
                 raise ValueError("--transcribe-model is not supported with --transcribe apple")
@@ -298,6 +311,7 @@ def main(argv=None):
         transcription_language=args.transcription_language,
         transcriber_name=args.transcribe, transcribe_api_key=transcribe_key,
         transcribe_model=args.transcribe_model, summarize_model=args.summarize_model,
+        feedback_path=args.feedback,
     )
 
 if __name__ == "__main__":

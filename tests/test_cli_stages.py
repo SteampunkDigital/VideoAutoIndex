@@ -79,6 +79,20 @@ def test_analyze_does_not_validate_skipped_transcription(cli, monkeypatch):
     assert cli.call_args.kwargs["transcribe_api_key"] is None
 
 
+def test_feedback_cli_uses_existing_transcript(cli, monkeypatch):
+    monkeypatch.setattr('src.main.check_ffmpeg', lambda: pytest.fail('ffmpeg is unused'))
+    main(['meeting.mp4', '--skipto', 'analyze', '--feedback', 'feedback.json', '--summarize', 'apple'])
+    assert cli.call_args.kwargs['feedback_path'] == 'feedback.json'
+    assert cli.call_args.kwargs['transcribe_api_key'] is None
+
+
+def test_feedback_cannot_silently_start_new_transcription(cli, capsys):
+    with pytest.raises(SystemExit):
+        main(['meeting.mp4', '--feedback', 'feedback.json', '--summarize', 'apple'])
+    assert '--feedback requires --skipto analyze' in capsys.readouterr().err
+    cli.assert_not_called()
+
+
 @pytest.mark.parametrize("arguments,error", [
     ([], "--summarize is required"),
     (["--transcribe", "openai", "--summarize", "apple"], "OPENAI_API_KEY"),

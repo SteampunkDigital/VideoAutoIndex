@@ -85,6 +85,7 @@ class WebGenerator:
         
         # Extract chunks and format for web display
         chunks = []
+        speaker_names = transcript_data.get('speaker_names', {})
         colors = {speaker: SPEAKER_COLORS[i % len(SPEAKER_COLORS)]
                   for i, speaker in enumerate(transcript_data.get('speakers', []))
                   if isinstance(speaker, str)}
@@ -99,7 +100,7 @@ class WebGenerator:
                 colors[speaker] = SPEAKER_COLORS[len(colors) % len(SPEAKER_COLORS)]
             chunks.append({
                 'id': chunk['id'], 'speaker': speaker,
-                'speaker_label': (speaker or 'Unknown speaker') if 'speaker' in chunk else None,
+                'speaker_label': (speaker_names.get(speaker, speaker) if speaker else 'Unknown speaker') if 'speaker' in chunk else None,
                 'speaker_color': colors.get(speaker, '#64748b'),
                 'start_seconds': start_time, 'end_seconds': end_time, 'text': chunk['text'],
                 'start_time_formatted': self._seconds_to_timestamp(start_time),
@@ -572,6 +573,7 @@ class WebGenerator:
                     'phrases': [{
                         'segment_id': c['id'], 'start_seconds': c['start_seconds'],
                         'end_seconds': c['end_seconds'], 'speaker_id': c.get('speaker'),
+                        'speaker_name': c.get('speaker_label') if c.get('speaker') else None,
                         'text': c['text'], 'start_time': c['start_time_formatted'],
                     } for c in (transcript or [])],
                 },

@@ -244,10 +244,30 @@ that region from the export. Unknown voices retain a null speaker ID.
 
 Edits are kept in memory only; reload resets them. Use **Copy correction JSON**
 before leaving the page to retain the feedback. The HTML embeds its editor script
-and requires no server or browser storage. The export is a feedback contract for
-subsequent targeted experiments; automatic JSON import/retranscription is a
-separate phase. A consumer should validate the source hash and original region
-anchors, and keep hints scoped to the corrected regions.
+and requires no server or browser storage.
+
+Save the copied JSON to a file, then import it against the output directory that
+contains the transcript used to generate that page:
+
+```bash
+./run.sh meeting.mp4 --skipto analyze --summarize openai --output-dir output --feedback feedback.json
+```
+
+`--feedback` requires `--skipto analyze`. It applies your **confirmed names and
+exact text corrections**, then reruns summarization and HTML generation. It does
+not run recognition again or send the word hints as a global ASR prompt. The
+original `audio_transcript.json` and `audio_subtitles.srt` remain intact; reviewed
+results are written as `audio_transcript.reviewed.json`,
+`audio_subtitles.reviewed.srt`, `meeting_analysis.reviewed.json`, and
+`<video_name>_reviewed_summary.html`. Speaker IDs stay stable; display names are
+stored separately in `speaker_names`. Clearing a phrase explicitly removes it.
+
+The importer validates the source transcript SHA-256, media filename, region IDs,
+original text, timestamps, and speaker mappings before writing reviewed files.
+A mismatch stops the import. Feedback exported from a reviewed page can be applied
+again using the same command and output directory; its reviewed source fingerprint
+is recognized too. Keep word hints scoped to their regions when experimenting with
+future ASR retranscription.
 
 ## Output Format
 

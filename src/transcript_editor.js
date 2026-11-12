@@ -9,7 +9,7 @@
         const phrases = initial.phrases.map(phrase => ({...phrase, correctedText: phrase.text}));
         const speakerNames = new Map();
         phrases.forEach(phrase => {
-            if (phrase.speaker_id) speakerNames.set(phrase.speaker_id, phrase.speaker_id);
+            if (phrase.speaker_id) speakerNames.set(phrase.speaker_id, phrase.speaker_name || phrase.speaker_id);
         });
         const snapshots = new WeakMap();
         const exportBox = document.getElementById('corrections-json');

@@ -36,13 +36,16 @@ def format_timestamp(seconds):
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 
-def transcript_to_srt(chunks):
+def transcript_to_srt(chunks, speaker_names=None):
+    speaker_names = speaker_names or {}
     cues = []
     for index, chunk in enumerate(chunks, 1):
         start, end = chunk["timestamp"]
         text = " ".join(chunk["text"].split())
         if "speaker" in chunk:
-            text = f"[{chunk['speaker'] or 'Unknown speaker'}] {text}"
+            speaker_id = chunk['speaker']
+            label = speaker_names.get(speaker_id, speaker_id) if speaker_id else 'Unknown speaker'
+            text = f"[{label}] {text}"
         cues.append(f"{index}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{text}\n")
     return "\n".join(cues)
 
@@ -52,7 +55,7 @@ def write_transcript(data, transcript_path, subtitle_path):
     chunks = [normalize_chunk(chunk, i) for i, chunk in enumerate(data["chunks"])]
     chunks.sort(key=lambda chunk: chunk["timestamp"][0])
     data = {**data, "chunks": chunks}
-    outputs = [(Path(subtitle_path), transcript_to_srt(chunks)),
+    outputs = [(Path(subtitle_path), transcript_to_srt(chunks, data.get('speaker_names'))),
                (Path(transcript_path), json.dumps(data, ensure_ascii=False, indent=2))]
     if outputs[0][0].resolve() == outputs[1][0].resolve():
         raise ValueError("Transcript and subtitle paths must be different")
